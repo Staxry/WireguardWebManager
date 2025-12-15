@@ -1,0 +1,79 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyc
+*.pyd
+.Python
+
+# Виртуальные окружения
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE и редакторы
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Pytest cache
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Логи и временные файлы
+*.log
+logs/
+*.tmp
+*.temp
+
+# Базы данных
+*.db
+*.sqlite
+*.sqlite3
+data/*.db
+data/*.sqlite
+
+# Конфигурационные файлы с секретами (НЕ КОММИТИТЬ!)
+*.json
+!package.json
+!package-lock.json
+!requirements.txt
+!.admin_config.json.example
+!data/api_keys.json.example
+data/api_keys.json
+data/params
+.admin_config.json
+admin_config.json
+/etc/wireguard-web/
+
+# WireGuard конфигурации (не коммитить реальные конфиги)
+wireguard/*.conf
+/root/*.conf
+/etc/wireguard/*.conf
+
+# Системные файлы
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Файлы и папки помощников/инструментов
+.zencoder/
+
+# Резервные копии
+*.bak
+*.backup
+*~
+
+# SSL сертификаты (если есть)
+*.pem
+*.key
+*.crt
+*.cert
+

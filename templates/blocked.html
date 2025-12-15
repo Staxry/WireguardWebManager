@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+
+{% block title %}IP адрес заблокирован{% endblock %}
+
+{% block header %}🚫 Доступ заблокирован{% endblock %}
+
+{% block content %}
+<div class="blocked-container">
+    <div class="blocked-icon">🚫</div>
+    
+    <h2>Ваш IP адрес заблокирован</h2>
+    
+    <div class="block-info">
+        <div class="info-item">
+            <span class="info-label">Причина блокировки:</span>
+            <span class="info-value">{{ block_info.reason }}</span>
+        </div>
+        
+        <div class="info-item">
+            <span class="info-label">Время блокировки:</span>
+            <span class="info-value">{{ block_info.blocked_at }}</span>
+        </div>
+        
+        <div class="info-item">
+            <span class="info-label">Блокировка истекает:</span>
+            <span class="info-value" id="expiresAt">{{ expires_at.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+        </div>
+        
+        <div class="info-item">
+            <span class="info-label">Количество попыток:</span>
+            <span class="info-value">{{ block_info.attempts }}</span>
+        </div>
+    </div>
+    
+    <div class="countdown-container">
+        <h3>Время до разблокировки:</h3>
+        <div class="countdown" id="countdown">
+            <div class="countdown-item">
+                <span class="countdown-number" id="hours">00</span>
+                <span class="countdown-label">часов</span>
+            </div>
+            <div class="countdown-item">
+                <span class="countdown-number" id="minutes">00</span>
+                <span class="countdown-label">минут</span>
+            </div>
+            <div class="countdown-item">
+                <span class="countdown-number" id="seconds">00</span>
+                <span class="countdown-label">секунд</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="help-section">
+        <h3>Что делать?</h3>
+        <ul>
+            <li>Дождитесь истечения времени блокировки</li>
+            <li>Проверьте правильность вводимых данных</li>
+            <li>Обратитесь к администратору если считаете блокировку ошибочной</li>
+            <li>Используйте другое подключение к интернету</li>
+        </ul>
+    </div>
+    
+    <div class="contact-info">
+        <h3>Контактная информация</h3>
+        <p>Если вы считаете, что блокировка произошла по ошибке, обратитесь к системному администратору.</p>
+    </div>
+</div>
+
+<script>
+// Обратный отсчет до разблокировки
+const expiresAt = new Date('{{ expires_at.isoformat() }}').getTime();
+
+function updateCountdown() {
+    const now = new Date().getTime();
+    const timeLeft = expiresAt - now;
+    
+    if (timeLeft <= 0) {
+        document.getElementById('countdown').innerHTML = '<div class="countdown-expired">Блокировка истекла! Обновите страницу.</div>';
+        setTimeout(() => {
+            location.reload();
+        }, 2000);
+        return;
+    }
+    
+    const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+    const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+    
+    document.getElementById('hours').textContent = hours.toString().padStart(2, '0');
+    document.getElementById('minutes').textContent = minutes.toString().padStart(2, '0');
+    document.getElementById('seconds').textContent = seconds.toString().padStart(2, '0');
+}
+
+// Обновляем каждую секунду
+setInterval(updateCountdown, 1000);
+updateCountdown();
+</script>
+
+<style>
+.blocked-container {
+    max-width: 600px;
+    margin: 0 auto;
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.blocked-icon {
+    font-size: 80px;
+    margin-bottom: 30px;
+    opacity: 0.8;
+}
+
+.blocked-container h2 {
+    color: var(--danger-color);
+    margin-bottom: 30px;
+    font-size: 28px;
+}
+
+.block-info {
+    background: var(--bg-tertiary);
+    border-radius: 12px;
+    padding: 25px;
+    margin-bottom: 30px;
+    text-align: left;
+}
+
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.info-item:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.info-label {
+    font-weight: bold;
+    color: var(--text-secondary);
+}
+
+.info-value {
+    color: var(--text-primary);
+    font-family: monospace;
+}
+
+.countdown-container {
+    margin-bottom: 40px;
+}
+
+.countdown-container h3 {
+    margin-bottom: 20px;
+    color: var(--text-primary);
+}
+
+.countdown {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.countdown-item {
+    background: var(--bg-tertiary);
+    border-radius: 12px;
+    padding: 20px;
+    min-width: 80px;
+}
+
+.countdown-number {
+    display: block;
+    font-size: 32px;
+    font-weight: bold;
+    color: var(--danger-color);
+    margin-bottom: 5px;
+}
+
+.countdown-label {
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.countdown-expired {
+    background: var(--success-bg);
+    color: var(--success-color);
+    padding: 20px;
+    border-radius: 12px;
+    font-weight: bold;
+    font-size: 18px;
+}
+
+.help-section, .contact-info {
+    background: var(--bg-tertiary);
+    border-radius: 12px;
+    padding: 25px;
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.help-section h3, .contact-info h3 {
+    margin-bottom: 15px;
+    color: var(--text-primary);
+}
+
+.help-section ul {
+    list-style-position: inside;
+    color: var(--text-secondary);
+}
+
+.help-section li {
+    margin-bottom: 8px;
+}
+
+.contact-info p {
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+    .blocked-container {
+        padding: 20px 10px;
+    }
+    
+    .blocked-icon {
+        font-size: 60px;
+    }
+    
+    .blocked-container h2 {
+        font-size: 24px;
+    }
+    
+    .countdown {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .countdown-item {
+        min-width: 120px;
+    }
+    
+    .info-item {
+        flex-direction: column;
+        gap: 5px;
+    }
+}
+</style>
+{% endblock %}

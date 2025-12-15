@@ -1,0 +1,9 @@
+{
+  "username": "admin",
+  "password_hash": "CHANGE_THIS:generate_hash_using_admin_config_module",
+  "secret_key": "CHANGE_THIS_generate_random_secret_key_at_least_32_chars",
+  "session_timeout": 600,
+  "max_login_attempts": 5,
+  "lockout_duration": 300
+}
+

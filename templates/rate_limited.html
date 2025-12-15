@@ -1,0 +1,351 @@
+{% extends "base.html" %}
+
+{% block title %}Превышен лимит запросов{% endblock %}
+
+{% block header %}⚠️ Превышен лимит запросов{% endblock %}
+
+{% block content %}
+<div class="rate-limit-container">
+    <div class="rate-limit-icon">⚠️</div>
+    
+    <h2>Слишком много запросов</h2>
+    
+    <div class="limit-info">
+        <div class="info-item">
+            <span class="info-label">Тип ограничения:</span>
+            <span class="info-value">{{ limit_type }}</span>
+        </div>
+        
+        <div class="info-item">
+            <span class="info-label">Сброс лимита:</span>
+            <span class="info-value" id="resetAt">{{ reset_at.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+        </div>
+        
+        {% if blocked %}
+        <div class="info-item warning">
+            <span class="info-label">Статус:</span>
+            <span class="info-value">IP адрес заблокирован</span>
+        </div>
+        {% endif %}
+    </div>
+    
+    <div class="countdown-container">
+        <h3>Время до сброса лимита:</h3>
+        <div class="countdown" id="countdown">
+            <div class="countdown-item">
+                <span class="countdown-number" id="minutes">00</span>
+                <span class="countdown-label">минут</span>
+            </div>
+            <div class="countdown-item">
+                <span class="countdown-number" id="seconds">00</span>
+                <span class="countdown-label">секунд</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="explanation-section">
+        <h3>Что это означает?</h3>
+        <div class="explanation-content">
+            {% if limit_type == 'login' %}
+            <p>Вы превысили лимит попыток входа в систему. Это мера безопасности для защиты от атак.</p>
+            <ul>
+                <li>Максимум 5 попыток входа за 5 минут</li>
+                <li>Проверьте правильность логина и пароля</li>
+                <li>Дождитесь сброса лимита</li>
+            </ul>
+            {% elif limit_type == 'api_general' %}
+            <p>Превышен лимит API запросов. Замедлите частоту обращений к API.</p>
+            <ul>
+                <li>Максимум 100 запросов в минуту</li>
+                <li>Используйте кэширование данных</li>
+                <li>Оптимизируйте количество запросов</li>
+            </ul>
+            {% elif limit_type == 'password_change' %}
+            <p>Слишком частые попытки смены пароля. Это мера безопасности.</p>
+            <ul>
+                <li>Максимум 3 смены пароля в час</li>
+                <li>Убедитесь в правильности нового пароля</li>
+                <li>Дождитесь сброса лимита</li>
+            </ul>
+            {% else %}
+            <p>Превышен лимит запросов для данного типа операций.</p>
+            <ul>
+                <li>Замедлите частоту запросов</li>
+                <li>Дождитесь сброса лимита</li>
+                <li>Обратитесь к администратору при необходимости</li>
+            </ul>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="actions-section">
+        <button onclick="checkLimit()" class="btn btn-primary" id="checkBtn">
+            🔄 Проверить лимит
+        </button>
+        
+        {% if not blocked %}
+        <button onclick="goBack()" class="btn btn-secondary">
+            ↩️ Назад
+        </button>
+        {% endif %}
+        
+        <a href="{{ url_for('index') }}" class="btn btn-info">
+            🏠 На главную
+        </a>
+    </div>
+    
+    {% if blocked %}
+    <div class="blocked-warning">
+        <h3>🚫 IP адрес заблокирован</h3>
+        <p>Из-за превышения лимитов ваш IP адрес был временно заблокирован. Блокировка будет снята автоматически.</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Обратный отсчет до сброса лимита
+const resetAt = new Date('{{ reset_at.isoformat() }}').getTime();
+
+function updateCountdown() {
+    const now = new Date().getTime();
+    const timeLeft = resetAt - now;
+    
+    if (timeLeft <= 0) {
+        document.getElementById('countdown').innerHTML = '<div class="countdown-expired">Лимит сброшен! Можете продолжить.</div>';
+        document.getElementById('checkBtn').textContent = '✅ Лимит сброшен';
+        document.getElementById('checkBtn').classList.remove('btn-primary');
+        document.getElementById('checkBtn').classList.add('btn-success');
+        return;
+    }
+    
+    const minutes = Math.floor(timeLeft / (1000 * 60));
+    const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+    
+    document.getElementById('minutes').textContent = minutes.toString().padStart(2, '0');
+    document.getElementById('seconds').textContent = seconds.toString().padStart(2, '0');
+}
+
+function checkLimit() {
+    const now = new Date().getTime();
+    if (resetAt <= now) {
+        location.reload();
+    } else {
+        showNotification('Лимит еще не сброшен. Подождите немного.', 'warning');
+    }
+}
+
+function goBack() {
+    if (window.history.length > 1) {
+        window.history.back();
+    } else {
+        window.location.href = '/';
+    }
+}
+
+// Обновляем каждую секунду
+setInterval(updateCountdown, 1000);
+updateCountdown();
+</script>
+
+<style>
+.rate-limit-container {
+    max-width: 600px;
+    margin: 0 auto;
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.rate-limit-icon {
+    font-size: 80px;
+    margin-bottom: 30px;
+    opacity: 0.8;
+}
+
+.rate-limit-container h2 {
+    color: var(--warning-color);
+    margin-bottom: 30px;
+    font-size: 28px;
+}
+
+.limit-info {
+    background: var(--bg-tertiary);
+    border-radius: 12px;
+    padding: 25px;
+    margin-bottom: 30px;
+    text-align: left;
+}
+
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.info-item:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.info-item.warning {
+    background: var(--warning-bg);
+    padding: 10px;
+    border-radius: 6px;
+    border: none;
+}
+
+.info-label {
+    font-weight: bold;
+    color: var(--text-secondary);
+}
+
+.info-value {
+    color: var(--text-primary);
+    font-family: monospace;
+}
+
+.countdown-container {
+    margin-bottom: 40px;
+}
+
+.countdown-container h3 {
+    margin-bottom: 20px;
+    color: var(--text-primary);
+}
+
+.countdown {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.countdown-item {
+    background: var(--bg-tertiary);
+    border-radius: 12px;
+    padding: 20px;
+    min-width: 80px;
+}
+
+.countdown-number {
+    display: block;
+    font-size: 32px;
+    font-weight: bold;
+    color: var(--warning-color);
+    margin-bottom: 5px;
+}
+
+.countdown-label {
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.countdown-expired {
+    background: var(--success-bg);
+    color: var(--success-color);
+    padding: 20px;
+    border-radius: 12px;
+    font-weight: bold;
+    font-size: 18px;
+}
+
+.explanation-section {
+    background: var(--bg-tertiary);
+    border-radius: 12px;
+    padding: 25px;
+    margin-bottom: 30px;
+    text-align: left;
+}
+
+.explanation-section h3 {
+    margin-bottom: 15px;
+    color: var(--text-primary);
+}
+
+.explanation-content p {
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 15px;
+}
+
+.explanation-content ul {
+    list-style-position: inside;
+    color: var(--text-secondary);
+}
+
+.explanation-content li {
+    margin-bottom: 8px;
+}
+
+.actions-section {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 30px;
+}
+
+.blocked-warning {
+    background: var(--danger-bg);
+    border: 2px solid var(--danger-color);
+    border-radius: 12px;
+    padding: 25px;
+    text-align: left;
+}
+
+.blocked-warning h3 {
+    color: var(--danger-color);
+    margin-bottom: 15px;
+}
+
+.blocked-warning p {
+    color: var(--danger-color);
+    line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+    .rate-limit-container {
+        padding: 20px 10px;
+    }
+    
+    .rate-limit-icon {
+        font-size: 60px;
+    }
+    
+    .rate-limit-container h2 {
+        font-size: 24px;
+    }
+    
+    .countdown {
+        flex-direction: row;
+        justify-content: center;
+    }
+    
+    .countdown-item {
+        min-width: 70px;
+        padding: 15px;
+    }
+    
+    .countdown-number {
+        font-size: 24px;
+    }
+    
+    .info-item {
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .actions-section {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .actions-section .btn {
+        width: 100%;
+        max-width: 250px;
+    }
+}
+</style>
+{% endblock %}

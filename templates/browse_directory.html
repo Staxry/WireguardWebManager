@@ -1,0 +1,463 @@
+{% extends "base.html" %}
+
+{% block title %}Обзор файловой системы - WireGuard Management{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="header-section">
+        <h1>🗂️ Обзор файловой системы</h1>
+        <p>Просмотр директорий и поиск конфигурационных файлов WireGuard</p>
+    </div>
+
+    <div class="navigation-section">
+        <div class="current-path">
+            <strong>Текущий путь:</strong>
+            <code>{{ current_path }}</code>
+        </div>
+        
+        <div class="nav-buttons">
+            {% if parent_path %}
+                <a href="{{ url_for('browse_directory', path=parent_path) }}" class="btn btn-outline">⬆️ Родительская папка</a>
+            {% endif %}
+            <a href="{{ url_for('browse_directory', path='/') }}" class="btn btn-outline">🏠 Корень</a>
+            <button onclick="scanCurrentPath()" class="btn btn-primary">🔍 Сканировать WG конфиги</button>
+        </div>
+    </div>
+
+    <div class="directory-content">
+        {% if items %}
+            <div class="items-grid">
+                {% for item in items %}
+                    <div class="item-card {% if item.is_wg_config %}wg-config{% endif %}">
+                        <div class="item-icon">
+                            {% if item.is_dir %}
+                                📁
+                            {% elif item.is_wg_config %}
+                                ⚙️
+                            {% else %}
+                                📄
+                            {% endif %}
+                        </div>
+                        
+                        <div class="item-info">
+                            <div class="item-name">{{ item.name }}</div>
+                            {% if item.is_wg_config %}
+                                <div class="item-badge">WireGuard Config</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="item-actions">
+                            {% if item.is_dir %}
+                                <a href="{{ url_for('browse_directory', path=item.path) }}" class="btn btn-sm btn-primary">Открыть</a>
+                                <button onclick="selectPath('{{ item.path }}', 'client')" class="btn btn-sm btn-success">Выбрать как папку клиентов</button>
+                            {% elif item.is_wg_config %}
+                                <button onclick="previewConfig('{{ item.path }}')" class="btn btn-sm btn-info">Просмотр</button>
+                                <button onclick="selectPath('{{ item.path }}', 'server')" class="btn btn-sm btn-success">Выбрать как серверный конфиг</button>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-directory">
+                <div class="empty-icon">📂</div>
+                <h3>Директория пуста или недоступна</h3>
+                <p>В этой директории нет доступных файлов или у вас нет прав доступа</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <div id="scan-results" class="scan-results" style="display: none;"></div>
+    
+    <div id="config-preview" class="config-preview" style="display: none;">
+        <div class="preview-header">
+            <h3>Просмотр конфигурации</h3>
+            <button onclick="closePreview()" class="btn btn-sm btn-outline">✕</button>
+        </div>
+        <div class="preview-content">
+            <pre id="preview-text"></pre>
+        </div>
+    </div>
+
+    <div class="actions">
+        <a href="{{ url_for('config_paths') }}" class="btn btn-secondary">← Назад к настройкам</a>
+        <a href="{{ url_for('index') }}" class="btn btn-primary">🏠 Главная</a>
+    </div>
+</div>
+
+<style>
+.navigation-section {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow);
+}
+
+.current-path {
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.current-path code {
+    background: var(--bg-tertiary);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-family: 'Courier New', monospace;
+    flex: 1;
+    min-width: 200px;
+}
+
+.nav-buttons {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.directory-content {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow);
+}
+
+.items-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 16px;
+}
+
+.item-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.item-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+}
+
+.item-card.wg-config {
+    border-color: var(--success-color);
+    background: var(--success-bg);
+}
+
+.item-icon {
+    font-size: 24px;
+    min-width: 32px;
+    text-align: center;
+}
+
+.item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.item-name {
+    font-weight: 500;
+    color: var(--text-primary);
+    word-break: break-all;
+}
+
+.item-badge {
+    font-size: 0.8em;
+    color: var(--success-color);
+    font-weight: 500;
+    margin-top: 4px;
+}
+
+.item-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.empty-directory {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--text-muted);
+}
+
+.empty-icon {
+    font-size: 64px;
+    margin-bottom: 16px;
+}
+
+.scan-results {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow);
+}
+
+.config-preview {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 800px;
+    max-height: 80vh;
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    box-shadow: var(--shadow-hover);
+    z-index: 1000;
+    overflow: hidden;
+}
+
+.preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+}
+
+.preview-content {
+    padding: 24px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.preview-content pre {
+    background: var(--bg-primary);
+    padding: 16px;
+    border-radius: 8px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+    line-height: 1.4;
+    margin: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 32px;
+}
+
+@media (max-width: 768px) {
+    .items-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .item-card {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .item-actions {
+        justify-content: center;
+    }
+    
+    .nav-buttons {
+        justify-content: center;
+    }
+    
+    .current-path {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .config-preview {
+        width: 95%;
+        max-height: 90vh;
+    }
+}
+</style>
+
+<script>
+function scanCurrentPath() {
+    const resultsDiv = document.getElementById('scan-results');
+    resultsDiv.style.display = 'block';
+    resultsDiv.innerHTML = '<div class="loading">🔍 Сканирование конфигураций WireGuard...</div>';
+    
+    fetch(`{{ url_for('scan_configs_in_path') }}?path=${encodeURIComponent('{{ current_path }}')}`)
+        .then(response => response.json())
+        .then(result => {
+            if (result.error) {
+                resultsDiv.innerHTML = `<div class="error">❌ ${result.error}</div>`;
+                return;
+            }
+            
+            let html = `<h3>Результаты сканирования в {{ current_path }}</h3>`;
+            
+            if (result.count === 0) {
+                html += '<p>Конфигурационные файлы WireGuard не найдены</p>';
+            } else {
+                html += `<p>Найдено конфигураций: <strong>${result.count}</strong></p>`;
+                html += '<div class="config-list">';
+                
+                result.configs.forEach(config => {
+                    const typeIcon = config.type === 'client' ? '👤' : config.type === 'server' ? '🖥️' : '❓';
+                    const typeText = config.type === 'client' ? 'Клиент' : config.type === 'server' ? 'Сервер' : 'Неизвестно';
+                    
+                    html += `
+                        <div class="config-item">
+                            <div class="config-info">
+                                <span class="config-icon">${typeIcon}</span>
+                                <span class="config-name">${config.name}</span>
+                                <span class="config-type">${typeText}</span>
+                                <span class="config-size">${(config.size / 1024).toFixed(1)} KB</span>
+                            </div>
+                            <div class="config-actions">
+                                <button onclick="previewConfig('${config.path}')" class="btn btn-sm btn-info">Просмотр</button>
+                                ${config.type === 'server' ? 
+                                    `<button onclick="selectPath('${config.path}', 'server')" class="btn btn-sm btn-success">Выбрать как серверный</button>` : 
+                                    ''
+                                }
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+                
+                if (result.configs.some(c => c.type === 'client')) {
+                    html += `<div class="bulk-action">
+                        <button onclick="selectPath('{{ current_path }}', 'client')" class="btn btn-success">
+                            📁 Использовать эту папку для клиентских конфигов
+                        </button>
+                    </div>`;
+                }
+            }
+            
+            resultsDiv.innerHTML = html;
+        })
+        .catch(error => {
+            resultsDiv.innerHTML = `<div class="error">❌ Ошибка сканирования: ${error.message}</div>`;
+        });
+}
+
+function previewConfig(path) {
+    fetch(`/api/preview_config?path=${encodeURIComponent(path)}`)
+        .then(response => response.text())
+        .then(content => {
+            document.getElementById('preview-text').textContent = content;
+            document.getElementById('config-preview').style.display = 'block';
+        })
+        .catch(error => {
+            alert(`Ошибка загрузки конфигурации: ${error.message}`);
+        });
+}
+
+function closePreview() {
+    document.getElementById('config-preview').style.display = 'none';
+}
+
+function selectPath(path, type) {
+    if (confirm(`Установить путь ${path} как ${type === 'client' ? 'папку клиентских конфигураций' : 'серверную конфигурацию'}?`)) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '{{ url_for("set_config_path") }}';
+        
+        const typeInput = document.createElement('input');
+        typeInput.type = 'hidden';
+        typeInput.name = 'path_type';
+        typeInput.value = type;
+        
+        const pathInput = document.createElement('input');
+        pathInput.type = 'hidden';
+        pathInput.name = 'path';
+        pathInput.value = type === 'client' && !path.endsWith('/') ? path + '/' : path;
+        
+        form.appendChild(typeInput);
+        form.appendChild(pathInput);
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+// Закрытие превью по клику вне окна
+document.addEventListener('click', function(event) {
+    const preview = document.getElementById('config-preview');
+    if (event.target === preview) {
+        closePreview();
+    }
+});
+</script>
+
+<style>
+.config-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 16px 0;
+}
+
+.config-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    border-left: 4px solid var(--success-color);
+}
+
+.config-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.config-icon {
+    font-size: 18px;
+}
+
+.config-name {
+    font-weight: 500;
+    font-family: 'Courier New', monospace;
+}
+
+.config-type {
+    background: var(--primary-color);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.8em;
+}
+
+.config-size {
+    color: var(--text-muted);
+    font-size: 0.9em;
+}
+
+.config-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.bulk-action {
+    text-align: center;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-color);
+}
+
+.loading, .error {
+    text-align: center;
+    padding: 20px;
+    font-size: 1.1em;
+}
+
+.error {
+    color: var(--danger-color);
+}
+</style>
+{% endblock %}

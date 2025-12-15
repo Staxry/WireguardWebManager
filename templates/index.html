@@ -1,0 +1,1100 @@
+{% extends "base.html" %}
+
+{% block title %}Клиенты WireGuard{% endblock %}
+
+{% block header %}🌐 WireGuard Management - Клиенты{% endblock %}
+
+{% block content %}
+<!-- Статус сервера -->
+<div class="server-status">
+    <div class="status-card">
+        <div class="status-icon {% if interface_active %}status-active{% else %}status-inactive{% endif %}">
+            {% if interface_active %}🟢{% else %}🔴{% endif %}
+        </div>
+        <div class="status-info">
+            <h3>{{ interface_name }}</h3>
+            <span class="status-text">
+                {% if interface_active %}Сервер активен{% else %}Сервер неактивен{% endif %}
+            </span>
+        </div>
+    </div>
+</div>
+
+<!-- Панель действий -->
+<div class="header-actions">
+    <a href="{{ url_for('add_client') }}" class="btn btn-primary">
+        ➕ Добавить клиента
+    </a>
+    <a href="{{ url_for('import_clients') }}" class="btn btn-secondary">
+        📥 Импорт клиентов
+    </a>
+    <button onclick="refreshClients()" class="btn btn-info">
+        🔄 Обновить
+    </button>
+    <label class="auto-refresh">
+        <input type="checkbox" id="clientsAutoRefresh" onchange="toggleClientsAutoRefresh()">
+        Автообновление (30с)
+    </label>
+    <a href="{{ url_for('change_password') }}" class="btn btn-warning">
+        🔐 Сменить пароль
+    </a>
+    <a href="{{ url_for('config_paths') }}" class="btn btn-outline">
+        ⚙️ Настройка путей
+    </a>
+</div>
+
+<!-- Панель поиска и фильтрации -->
+<div class="search-filter-panel">
+    <div class="search-container">
+        <div class="search-box">
+            <input type="text" 
+                   id="searchInput" 
+                   placeholder="🔍 Поиск клиентов по имени или IP..." 
+                   autocomplete="off">
+            <button data-action="clear-search" class="clear-search" id="clearBtn" style="display: none;">✕</button>
+        </div>
+    </div>
+    
+    <div class="filter-container">
+        <select id="statusFilter">
+            <option value="">📊 Все статусы</option>
+            <option value="active">🟢 Активные</option>
+            <option value="inactive">🔴 Неактивные</option>
+            <option value="never_connected">⚪ Никогда не подключались</option>
+        </select>
+        
+        <select id="sortBy">
+            <option value="name">📝 По имени</option>
+            <option value="created">📅 По дате создания</option>
+            <option value="traffic">📊 По трафику</option>
+            <option value="last_seen">🕐 По последней активности</option>
+        </select>
+        
+        <button data-action="toggle-view" class="btn btn-secondary" id="viewToggle">
+            📋 Список
+        </button>
+    </div>
+</div>
+
+<!-- Статистика -->
+<div class="stats-panel">
+    <div class="stat-card">
+        <div class="stat-number" id="totalClients">{{ clients|length }}</div>
+        <div class="stat-label">Всего клиентов</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number" id="activeClients">0</div>
+        <div class="stat-label">Активных</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number" id="visibleClients">{{ clients|length }}</div>
+        <div class="stat-label">Показано</div>
+    </div>
+</div>
+
+<!-- Список клиентов -->
+{% if clients %}
+<div class="clients-container" id="clientsContainer">
+    <!-- Табличный вид -->
+    <div class="table-view" id="tableView">
+        <table class="clients-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Имя клиента</th>
+                    <th>IP адрес</th>
+                    <th>Статус</th>
+                    <th>Трафик</th>
+                    <th>Последняя активность</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody id="clientsTableBody">
+                {% for client in clients %}
+                <tr class="client-row" 
+                    data-client-name="{{ client.name }}" 
+                    data-client-ip="{{ client.allowed_ips }}"
+                    data-client-status="{% if client.last_handshake %}active{% else %}never_connected{% endif %}"
+                    data-client-traffic="{{ client.traffic_formatted.total_bytes }}">
+                    <td>{{ client.id }}</td>
+                    <td class="client-name">
+                        <strong>{{ client.name }}</strong>
+                    </td>
+                    <td class="client-ip">{{ client.allowed_ips }}</td>
+                    <td class="client-status">
+                        {% if client.last_handshake %}
+                            <span class="status-badge active">🟢 Активен</span>
+                        {% else %}
+                            <span class="status-badge inactive">⚪ Не подключался</span>
+                        {% endif %}
+                    </td>
+                    <td class="traffic-info">
+                        <div class="traffic-received">↓ {{ client.traffic_formatted.received }}</div>
+                        <div class="traffic-sent">↑ {{ client.traffic_formatted.sent }}</div>
+                        <div class="traffic-total">📊 {{ client.traffic_formatted.total }}</div>
+                    </td>
+                    <td class="last-seen">
+                        {% if client.last_handshake %}
+                            {{ client.last_handshake }}
+                        {% else %}
+                            <span class="never-connected">Никогда</span>
+                        {% endif %}
+                    </td>
+                    <td class="actions">
+                        <div class="action-buttons">
+                            <a href="{{ url_for('download_client_config', client_id=client.id) }}" 
+                               class="btn btn-sm btn-primary" title="Скачать конфигурацию">
+                                📥
+                            </a>
+                            <a href="{{ url_for('qr_client_config', client_id=client.id) }}" 
+                               class="btn btn-sm btn-info" title="QR-код">
+                                📱
+                            </a>
+                            <button data-action="open-config" 
+                                    data-client-id="{{ client.id }}" 
+                                    data-client-name="{{ client.name|e }}" 
+                                    class="btn btn-sm btn-secondary" title="Открыть конфиг">
+                                📄
+                            </button>
+                            <button data-action="delete-client" 
+                                    data-client-name="{{ client.name|e }}" 
+                                    class="btn btn-sm btn-danger" title="Удалить">
+                                🗑️
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Карточный вид -->
+    <div class="card-view" id="cardView" style="display: none;">
+        {% for client in clients %}
+        <div class="client-card" 
+             data-client-name="{{ client.name }}" 
+             data-client-ip="{{ client.allowed_ips }}"
+             data-client-status="{% if client.last_handshake %}active{% else %}never_connected{% endif %}"
+             data-client-traffic="{{ client.traffic_formatted.total_bytes }}">
+            
+            <div class="card-header">
+                <h3 class="client-name">{{ client.name }}</h3>
+                <div class="client-status">
+                    {% if client.last_handshake %}
+                        <span class="status-badge active">🟢 Активен</span>
+                    {% else %}
+                        <span class="status-badge inactive">⚪ Не подключался</span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="card-body">
+                <div class="client-info">
+                    <div class="info-item">
+                        <span class="info-label">IP адрес:</span>
+                        <span class="info-value">{{ client.allowed_ips }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Публичный ключ:</span>
+                        <span class="info-value key-short">{{ client.public_key[:20] }}...</span>
+                    </div>
+                    {% if client.last_handshake %}
+                    <div class="info-item">
+                        <span class="info-label">Последняя активность:</span>
+                        <span class="info-value">{{ client.last_handshake }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="traffic-stats">
+                    <div class="traffic-item">
+                        <span class="traffic-label">↓ Получено:</span>
+                        <span class="traffic-value">{{ client.traffic_formatted.received }}</span>
+                    </div>
+                    <div class="traffic-item">
+                        <span class="traffic-label">↑ Отправлено:</span>
+                        <span class="traffic-value">{{ client.traffic_formatted.sent }}</span>
+                    </div>
+                    <div class="traffic-item total">
+                        <span class="traffic-label">📊 Всего:</span>
+                        <span class="traffic-value">{{ client.traffic_formatted.total }}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card-actions">
+                <a href="{{ url_for('download_client_config', client_id=client.id) }}" 
+                   class="btn btn-primary">
+                    📥 Скачать
+                </a>
+                <a href="{{ url_for('qr_client_config', client_id=client.id) }}" 
+                   class="btn btn-info">
+                    📱 QR-код
+                </a>
+                <button data-action="open-config" 
+                        data-client-id="{{ client.id }}" 
+                        data-client-name="{{ client.name|e }}" 
+                        class="btn btn-secondary">
+                    📄 Открыть
+                </button>
+                <button data-action="delete-client" 
+                        data-client-name="{{ client.name|e }}" 
+                        class="btn btn-danger">
+                    🗑️ Удалить
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Сообщение о пустом результате поиска -->
+<div id="noResults" class="no-results" style="display: none;">
+    <div class="no-results-icon">🔍</div>
+    <h3>Клиенты не найдены</h3>
+    <p>Попробуйте изменить параметры поиска или фильтрации</p>
+    <button onclick="clearSearch()" class="btn btn-primary">Очистить поиск</button>
+</div>
+
+{% else %}
+<div class="empty-state">
+    <div class="empty-icon">📡</div>
+    <h3>Клиенты не найдены</h3>
+    <p>Создайте первого клиента для начала работы с WireGuard</p>
+    <a href="{{ url_for('add_client') }}" class="btn btn-primary">
+        ➕ Создать первого клиента
+    </a>
+</div>
+{% endif %}
+
+<script>
+let currentView = 'table';
+let allClients = [];
+const CLIENTS_STATE_KEY = 'wg_clients_view_state';
+let clientsAutoRefreshInterval = null;
+const CLIENTS_AUTO_REFRESH_KEY = 'wg_clients_auto_refresh';
+
+// Инициализация при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    restoreViewState();
+    initializeClients();
+    updateStats();
+    filterClients(); // применяем фильтры сразу, если сохранены
+    sortClients();
+
+    // Запускаем автообновление, если было включено ранее
+    const autoRefreshSaved = localStorage.getItem(CLIENTS_AUTO_REFRESH_KEY);
+    if (autoRefreshSaved === '1') {
+        const cb = document.getElementById('clientsAutoRefresh');
+        if (cb) {
+            cb.checked = true;
+            startClientsAutoRefresh();
+        }
+    }
+    
+    // Обработчики для кнопок действий через делегирование событий
+    document.addEventListener('click', function(e) {
+        const button = e.target.closest('[data-action]');
+        if (!button) return;
+        
+        const action = button.getAttribute('data-action');
+        if (action === 'open-config') {
+            const clientId = parseInt(button.getAttribute('data-client-id'));
+            const clientName = button.getAttribute('data-client-name');
+            openConfigModal(clientId, clientName);
+        } else if (action === 'delete-client') {
+            const clientName = button.getAttribute('data-client-name');
+            deleteClient(clientName, button);
+        } else if (action === 'toggle-view') {
+            toggleView();
+        } else if (action === 'clear-search') {
+            clearSearch();
+        }
+    });
+    
+    // Обработчики для полей поиска и фильтров
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.addEventListener('keyup', filterClients);
+        searchInput.addEventListener('input', filterClients);
+    }
+    
+    const statusFilter = document.getElementById('statusFilter');
+    if (statusFilter) {
+        statusFilter.addEventListener('change', filterClients);
+    }
+    
+    const sortBy = document.getElementById('sortBy');
+    if (sortBy) {
+        sortBy.addEventListener('change', sortClients);
+    }
+});
+
+// Открытие модального окна с конфигом и действиями
+async function openConfigModal(clientId, clientName) {
+    try {
+        // Загружаем текст конфига
+        const resp = await fetch(`/view_client_config/${clientId}`);
+        const html = await resp.text();
+        
+        // Извлекаем текст конфига из HTML страницы (ищем <textarea id="config-text">)
+        const tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        const textarea = tmp.querySelector('#config-text');
+        const configText = textarea ? textarea.value : 'Не удалось загрузить конфигурацию';
+        
+        // Создаем модальное окно (если нет)
+        let modal = document.getElementById('configModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'configModal';
+            modal.className = 'modal-overlay';
+            modal.innerHTML = `
+                <div class="modal">
+                    <div class="modal-header">
+                        <h3>Конфигурация: <span id="modalClientName"></span></h3>
+                        <button class="close-btn" onclick="closeConfigModal()">✕</button>
+                    </div>
+                    <div class="modal-actions">
+                        <a id="modalDownload" class="btn btn-sm btn-primary" target="_blank">📥 Скачать</a>
+                        <a id="modalQr" class="btn btn-sm btn-info" target="_blank">📱 QR</a>
+                        <button id="modalRename" class="btn btn-sm btn-warning">✏️ Переименовать</button>
+                        <button id="modalDelete" class="btn btn-sm btn-danger">🗑️ Удалить</button>
+                    </div>
+                    <textarea id="modalConfigText" readonly style="height:260px"></textarea>
+                </div>`;
+            document.body.appendChild(modal);
+        }
+        
+        // Заполняем данные
+        modal.querySelector('#modalClientName').textContent = clientName;
+        modal.querySelector('#modalConfigText').value = configText;
+        modal.querySelector('#modalDownload').href = `/download_client_config/${clientId}`;
+        modal.querySelector('#modalQr').href = `/qr_client_config/${clientId}`;
+        
+        // Обработчик удаления
+        modal.querySelector('#modalDelete').onclick = function() {
+            closeConfigModal();
+            deleteClient(clientName, this);
+        };
+        
+        // Обработчик переименования
+        modal.querySelector('#modalRename').onclick = async () => {
+            const newName = prompt('Новое имя клиента:', clientName);
+            if (!newName || newName === clientName) return;
+            const res = await fetch(`/rename_client`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ old_name: clientName, new_name: newName })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showNotification(`Имя изменено на "${newName}"`, 'success');
+                location.reload();
+            } else {
+                showNotification(`Ошибка переименования: ${data.message}`, 'error');
+            }
+        };
+        
+        modal.style.display = 'flex';
+    } catch (e) {
+        console.error(e);
+        showNotification('Не удалось открыть конфигурацию', 'error');
+    }
+}
+
+function closeConfigModal() {
+    const modal = document.getElementById('configModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function initializeClients() {
+    // Берем элементы только из текущего видимого вида, чтобы не удваивать количество
+    const container = currentView === 'table'
+        ? document.getElementById('tableView')
+        : document.getElementById('cardView');
+    const selector = currentView === 'table' ? '.client-row' : '.client-card';
+    const clientNodes = container ? container.querySelectorAll(selector) : document.querySelectorAll(selector);
+    
+    // Формируем массив клиентов из DOM
+    allClients = Array.from(clientNodes).map(element => ({
+        element: element,
+        name: (element.dataset.clientName || '').toLowerCase(),
+        ip: (element.dataset.clientIp || '').toLowerCase(),
+        status: element.dataset.clientStatus || '',
+        traffic: parseInt(element.dataset.clientTraffic) || 0
+    }));
+}
+
+function filterClients() {
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const statusFilter = document.getElementById('statusFilter').value;
+    
+    let visibleCount = 0;
+    
+    allClients.forEach(client => {
+        let visible = true;
+        
+        // Поиск по имени или IP
+        if (searchTerm && !client.name.includes(searchTerm) && !client.ip.includes(searchTerm)) {
+            visible = false;
+        }
+        
+        // Фильтр по статусу
+        if (statusFilter && client.status !== statusFilter) {
+            visible = false;
+        }
+        
+        client.element.style.display = visible ? '' : 'none';
+        if (visible) visibleCount++;
+    });
+    
+    // Показываем/скрываем кнопку очистки поиска
+    const clearBtn = document.getElementById('clearBtn');
+    clearBtn.style.display = searchTerm ? 'block' : 'none';
+    
+    // Обновляем счетчик видимых клиентов
+    document.getElementById('visibleClients').textContent = visibleCount;
+    
+    // Показываем сообщение если ничего не найдено
+    const noResults = document.getElementById('noResults');
+    const clientsContainer = document.getElementById('clientsContainer');
+    
+    if (visibleCount === 0 && allClients.length > 0) {
+        noResults.style.display = 'block';
+        if (clientsContainer) clientsContainer.style.display = 'none';
+    } else {
+        noResults.style.display = 'none';
+        if (clientsContainer) clientsContainer.style.display = 'block';
+    }
+
+    saveViewState();
+}
+
+function sortClients() {
+    const sortBy = document.getElementById('sortBy').value;
+    
+    allClients.sort((a, b) => {
+        switch (sortBy) {
+            case 'name':
+                return a.name.localeCompare(b.name);
+            case 'traffic':
+                return b.traffic - a.traffic;
+            case 'created':
+                // Для простоты сортируем по порядку в DOM
+                return Array.from(a.element.parentNode.children).indexOf(a.element) - 
+                       Array.from(b.element.parentNode.children).indexOf(b.element);
+            case 'last_seen':
+                // Активные клиенты сначала
+                if (a.status === 'active' && b.status !== 'active') return -1;
+                if (b.status === 'active' && a.status !== 'active') return 1;
+                return 0;
+            default:
+                return 0;
+        }
+    });
+    
+    // Перестраиваем DOM
+    const container = currentView === 'table' ? 
+        document.getElementById('clientsTableBody') : 
+        document.getElementById('cardView');
+    
+    allClients.forEach(client => {
+        container.appendChild(client.element);
+    });
+
+    saveViewState();
+}
+
+function toggleView() {
+    const tableView = document.getElementById('tableView');
+    const cardView = document.getElementById('cardView');
+    const toggleBtn = document.getElementById('viewToggle');
+    
+    if (currentView === 'table') {
+        tableView.style.display = 'none';
+        cardView.style.display = 'grid';
+        toggleBtn.textContent = '📊 Таблица';
+        currentView = 'card';
+    } else {
+        tableView.style.display = 'block';
+        cardView.style.display = 'none';
+        toggleBtn.textContent = '📋 Карточки';
+        currentView = 'table';
+    }
+    
+    // Обновляем ссылки на элементы после смены вида
+    initializeClients();
+    saveViewState();
+}
+
+function clearSearch() {
+    document.getElementById('searchInput').value = '';
+    document.getElementById('statusFilter').value = '';
+    filterClients();
+}
+
+function updateStats() {
+    const totalClients = allClients.length;
+    const activeClients = allClients.filter(c => c.status === 'active').length;
+    
+    document.getElementById('totalClients').textContent = totalClients;
+    document.getElementById('activeClients').textContent = activeClients;
+}
+
+function refreshClients() {
+    location.reload();
+}
+
+function toggleClientsAutoRefresh() {
+    const cb = document.getElementById('clientsAutoRefresh');
+    if (!cb) return;
+    if (cb.checked) {
+        startClientsAutoRefresh();
+        localStorage.setItem(CLIENTS_AUTO_REFRESH_KEY, '1');
+    } else {
+        stopClientsAutoRefresh();
+        localStorage.setItem(CLIENTS_AUTO_REFRESH_KEY, '0');
+    }
+}
+
+function startClientsAutoRefresh() {
+    stopClientsAutoRefresh();
+    clientsAutoRefreshInterval = setInterval(() => {
+        refreshClients();
+    }, 30000); // 30 секунд
+}
+
+function stopClientsAutoRefresh() {
+    if (clientsAutoRefreshInterval) {
+        clearInterval(clientsAutoRefreshInterval);
+        clientsAutoRefreshInterval = null;
+    }
+}
+
+function saveViewState() {
+    try {
+        const state = {
+            view: currentView,
+            search: document.getElementById('searchInput').value,
+            status: document.getElementById('statusFilter').value,
+            sortBy: document.getElementById('sortBy').value
+        };
+        localStorage.setItem(CLIENTS_STATE_KEY, JSON.stringify(state));
+    } catch (e) {
+        console.warn('Не удалось сохранить состояние фильтров клиентов', e);
+    }
+}
+
+function restoreViewState() {
+    try {
+        const raw = localStorage.getItem(CLIENTS_STATE_KEY);
+        if (!raw) return;
+        const state = JSON.parse(raw);
+        if (state.search !== undefined) {
+            document.getElementById('searchInput').value = state.search;
+            document.getElementById('clearBtn').style.display = state.search ? 'block' : 'none';
+        }
+        if (state.status !== undefined) {
+            document.getElementById('statusFilter').value = state.status;
+        }
+        if (state.sortBy !== undefined) {
+            document.getElementById('sortBy').value = state.sortBy;
+        }
+        if (state.view === 'card') {
+            currentView = 'table'; // чтобы toggleView корректно переключил
+            toggleView();
+        }
+    } catch (e) {
+        console.warn('Не удалось восстановить состояние фильтров клиентов', e);
+    }
+}
+
+// Очищаем интервал при уходе со страницы
+window.addEventListener('beforeunload', function() {
+    stopClientsAutoRefresh();
+});
+
+function deleteClient(clientName, buttonElement) {
+    console.log('deleteClient called with:', clientName, buttonElement);
+    
+    if (!confirm(`Вы уверены, что хотите удалить клиента "${clientName}"?\n\nЭто действие нельзя отменить. Клиент будет полностью удален с сервера.`)) {
+        return;
+    }
+    
+    // Показываем индикатор загрузки
+    let deleteBtn = buttonElement;
+    if (!deleteBtn) {
+        // Ищем кнопку по data-атрибуту
+        const escapedName = CSS.escape(clientName);
+        deleteBtn = document.querySelector(`button[data-action="delete-client"][data-client-name="${escapedName}"]`);
+    }
+    
+    let originalText = '';
+    let wasDisabled = false;
+    
+    if (deleteBtn) {
+        originalText = deleteBtn.textContent;
+        wasDisabled = deleteBtn.disabled;
+        deleteBtn.textContent = '⏳';
+        deleteBtn.disabled = true;
+    } else {
+        console.warn('Delete button not found');
+    }
+    
+    const url = `/delete_client/${encodeURIComponent(clientName)}`;
+    console.log('Sending DELETE request to:', url);
+    
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        console.log('Response status:', response.status, response.statusText);
+        if (!response.ok) {
+            return response.json().then(err => {
+                console.error('Error response:', err);
+                throw new Error(err.message || `HTTP error! status: ${response.status}`);
+            }).catch(parseError => {
+                console.error('Failed to parse error response:', parseError);
+                throw new Error(`HTTP error! status: ${response.status}`);
+            });
+        }
+        return response.json().catch(parseError => {
+            console.error('Failed to parse success response:', parseError);
+            throw new Error('Не удалось обработать ответ сервера');
+        });
+    })
+    .then(data => {
+        if (data.success) {
+            // Удаляем элемент из DOM - ищем по data-client-name атрибуту
+            const escapedName = CSS.escape(clientName);
+            const clientRows = document.querySelectorAll(`tr[data-client-name="${escapedName}"]`);
+            const clientCards = document.querySelectorAll(`.card-view .card[data-client-name="${escapedName}"]`);
+            
+            // Удаляем найденные элементы
+            clientRows.forEach(el => el.remove());
+            clientCards.forEach(el => el.remove());
+            
+            // Также пытаемся найти через кнопку удаления по data-атрибуту
+            const deleteButtons = document.querySelectorAll(`button[data-action="delete-client"][data-client-name="${escapedName}"]`);
+            deleteButtons.forEach(btn => {
+                const row = btn.closest('tr');
+                const card = btn.closest('.card');
+                if (row) row.remove();
+                if (card) card.remove();
+            });
+            
+            // Обновляем массив клиентов
+            if (typeof allClients !== 'undefined') {
+                allClients = allClients.filter(c => c.name !== clientName.toLowerCase());
+            }
+            
+            // Обновляем статистику
+            if (typeof updateStats === 'function') {
+                updateStats();
+            }
+            if (typeof filterClients === 'function') {
+                filterClients();
+            }
+            
+            showNotification(`Клиент "${clientName}" успешно удален`, 'success');
+            
+            // Перезагружаем страницу через небольшую задержку для обновления данных
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showNotification(`Ошибка удаления клиента: ${data.message || 'Неизвестная ошибка'}`, 'error');
+            if (deleteBtn) {
+                deleteBtn.textContent = originalText;
+                deleteBtn.disabled = wasDisabled;
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error deleting client:', error);
+        showNotification(`Ошибка при удалении клиента: ${error.message || 'Неизвестная ошибка'}`, 'error');
+        if (deleteBtn) {
+            deleteBtn.textContent = originalText;
+            deleteBtn.disabled = wasDisabled;
+        }
+    });
+}
+
+// showNotification берется из общего static/app.js
+</script>
+
+<style>
+/* Модальное окно */
+.modal-overlay { display:none; position:fixed; inset:0; background: rgba(0,0,0,0.5); align-items:center; justify-content:center; z-index: 2000; }
+.modal { background: var(--bg-secondary); padding: 16px; border-radius: 8px; width: 90%; max-width: 800px; box-shadow: var(--shadow); }
+.modal-header { display:flex; align-items:center; justify-content: space-between; margin-bottom: 10px; }
+.modal-actions { display:flex; gap:8px; margin-bottom:10px; flex-wrap: wrap; }
+.modal textarea { width: 100%; height: 260px; font-family: 'Courier New', monospace; background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; }
+.close-btn { background:none; border:none; font-size: 18px; cursor:pointer; }
+
+/* Стили для поиска и фильтрации */
+.search-filter-panel {
+    background: var(--bg-secondary);
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    margin-bottom: 20px;
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.search-container {
+    flex: 1;
+    min-width: 300px;
+}
+
+.search-box {
+    position: relative;
+}
+
+.search-box input {
+    width: 100%;
+    padding: 12px 40px 12px 16px;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 16px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    transition: border-color 0.3s;
+}
+
+.search-box input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.25);
+}
+
+.clear-search {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    padding: 4px;
+    border-radius: 4px;
+}
+
+.clear-search:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.filter-container {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.filter-container select {
+    padding: 8px 12px;
+    border: 2px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 14px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+/* Статистика */
+.stats-panel {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.stat-card {
+    background: var(--bg-secondary);
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    text-align: center;
+}
+
+.stat-number {
+    font-size: 32px;
+    font-weight: bold;
+    color: var(--primary-color);
+    margin-bottom: 5px;
+}
+
+.stat-label {
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+/* Статус сервера */
+.server-status {
+    margin-bottom: 20px;
+}
+
+.status-card {
+    background: var(--bg-secondary);
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.status-icon {
+    font-size: 24px;
+}
+
+.status-info h3 {
+    margin: 0 0 5px 0;
+    color: var(--text-primary);
+}
+
+.status-text {
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+/* Таблица клиентов */
+.clients-table {
+    width: 100%;
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+}
+
+.clients-table th {
+    background: var(--bg-tertiary);
+    padding: 15px;
+    text-align: left;
+    font-weight: bold;
+    color: var(--text-primary);
+    border-bottom: 2px solid var(--border-color);
+}
+
+.clients-table td {
+    padding: 15px;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: top;
+    color: var(--text-primary);
+}
+
+.client-row:hover {
+    background: var(--bg-tertiary);
+}
+
+/* Имена клиентов */
+.client-name {
+    color: var(--text-primary) !important;
+    font-weight: bold;
+}
+
+.client-ip {
+    color: var(--text-secondary);
+}
+
+.traffic-info {
+    color: var(--text-primary);
+}
+
+.traffic-received, .traffic-sent, .traffic-total {
+    color: var(--text-primary);
+}
+
+.last-seen {
+    color: var(--text-secondary);
+}
+
+.never-connected {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* Карточный вид */
+.card-view {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+}
+
+.client-card {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.client-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+}
+
+.card-header {
+    background: var(--bg-tertiary);
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.card-header h3 {
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.card-body {
+    padding: 20px;
+}
+
+.info-item, .traffic-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.info-label, .traffic-label {
+    font-weight: bold;
+    color: var(--text-secondary);
+}
+
+.info-value, .traffic-value {
+    color: var(--text-primary);
+}
+
+.traffic-item.total {
+    border-top: 1px solid var(--border-color);
+    padding-top: 10px;
+    margin-top: 10px;
+    font-weight: bold;
+}
+
+.card-actions {
+    padding: 20px;
+    background: var(--bg-tertiary);
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+/* Статусы */
+.status-badge {
+    padding: 4px 8px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.status-badge.active {
+    background: var(--success-bg);
+    color: var(--success-color);
+}
+
+.status-badge.inactive {
+    background: var(--danger-bg);
+    color: var(--danger-color);
+}
+
+/* Пустое состояние */
+.empty-state, .no-results {
+    text-align: center;
+    padding: 60px 20px;
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+}
+
+.empty-icon, .no-results-icon {
+    font-size: 64px;
+    margin-bottom: 20px;
+}
+
+.empty-state h3, .no-results h3 {
+    color: var(--text-primary);
+    margin-bottom: 10px;
+}
+
+.empty-state p, .no-results p {
+    color: var(--text-secondary);
+    margin-bottom: 30px;
+}
+
+/* Уведомления */
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px 20px;
+    border-radius: 8px;
+    color: white;
+    font-weight: bold;
+    z-index: 1000;
+    transform: translateX(400px);
+    transition: transform 0.3s;
+}
+
+.notification.show {
+    transform: translateX(0);
+}
+
+.notification-success {
+    background: #28a745;
+}
+
+.notification-error {
+    background: #dc3545;
+}
+
+.notification-info {
+    background: #17a2b8;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .search-filter-panel {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .search-container {
+        min-width: auto;
+    }
+    
+    .filter-container {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    .stats-panel {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .card-view {
+        grid-template-columns: 1fr;
+    }
+    
+    .clients-table {
+        font-size: 14px;
+    }
+    
+    .clients-table th,
+    .clients-table td {
+        padding: 10px 8px;
+    }
+}
+</style>
+{% endblock %}

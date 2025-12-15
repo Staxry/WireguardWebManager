@@ -1,0 +1,425 @@
+{% extends "base.html" %}
+
+{% block title %}QR-код для {{ client_name }}{% endblock %}
+
+{% block header %}📱 QR-код для клиента: {{ client_name }}{% endblock %}
+
+{% block content %}
+<div class="qr-container">
+    <div class="qr-actions">
+        <a href="{{ url_for('view_client_config', client_id=client_id) if client_id else url_for('index') }}" class="btn btn-secondary">
+            ↩️ Назад к конфигурации
+        </a>
+        <button onclick="downloadQR()" class="btn btn-success">
+            📥 Скачать QR-код
+        </button>
+        <a href="{{ url_for('index') }}" class="btn btn-primary">
+            🏠 К списку клиентов
+        </a>
+    </div>
+
+    <div class="qr-display">
+        <div class="qr-code-container">
+            <h3>📱 Отсканируйте QR-код</h3>
+            <div class="qr-code">
+                <img id="qr-image" src="data:image/png;base64,{{ qr_image }}" alt="QR-код для {{ client_name }}">
+            </div>
+            <p class="qr-instructions">
+                📷 Используйте приложение WireGuard на мобильном устройстве<br>
+                для сканирования этого QR-кода
+            </p>
+        </div>
+
+        <div class="config-preview">
+            <h3>🔧 Конфигурация клиента</h3>
+            <textarea readonly>{{ client_config }}</textarea>
+            <button onclick="copyConfig()" class="btn btn-info">
+                📋 Копировать конфигурацию
+            </button>
+        </div>
+    </div>
+
+    <div class="mobile-instructions">
+        <h3>📱 Инструкции для мобильных устройств</h3>
+        
+        <div class="instruction-cards">
+            <div class="instruction-card">
+                <h4>🤖 Android</h4>
+                <ol>
+                    <li>📥 Установите <strong>WireGuard</strong> из Google Play</li>
+                    <li>➕ Нажмите кнопку <strong>"+"</strong></li>
+                    <li>📷 Выберите <strong>"Сканировать QR-код"</strong></li>
+                    <li>🔗 Отсканируйте код выше</li>
+                    <li>✅ Нажмите <strong>"Подключиться"</strong></li>
+                </ol>
+            </div>
+
+            <div class="instruction-card">
+                <h4>🍎 iOS</h4>
+                <ol>
+                    <li>📥 Установите <strong>WireGuard</strong> из App Store</li>
+                    <li>➕ Нажмите кнопку <strong>"+"</strong></li>
+                    <li>📷 Выберите <strong>"Создать из QR-кода"</strong></li>
+                    <li>🔗 Отсканируйте код выше</li>
+                    <li>💾 Нажмите <strong>"Сохранить"</strong></li>
+                    <li>✅ Включите туннель</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <div class="tips">
+        <h3>💡 Полезные советы</h3>
+        <div class="tips-grid">
+            <div class="tip">
+                <div class="tip-icon">🔍</div>
+                <div class="tip-content">
+                    <strong>Увеличьте QR-код</strong><br>
+                    Если код плохо сканируется, увеличьте масштаб страницы (Ctrl/Cmd + "+")
+                </div>
+            </div>
+            
+            <div class="tip">
+                <div class="tip-icon">💡</div>
+                <div class="tip-content">
+                    <strong>Хорошее освещение</strong><br>
+                    Убедитесь, что экран хорошо освещен для лучшего сканирования
+                </div>
+            </div>
+            
+            <div class="tip">
+                <div class="tip-icon">📱</div>
+                <div class="tip-content">
+                    <strong>Держите устойчиво</strong><br>
+                    Держите телефон неподвижно на расстоянии 10-20 см от экрана
+                </div>
+            </div>
+            
+            <div class="tip">
+                <div class="tip-icon">🔒</div>
+                <div class="tip-content">
+                    <strong>Безопасность</strong><br>
+                    Не показывайте QR-код посторонним - он содержит ваши ключи доступа
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyConfig() {
+    const configText = document.querySelector('.config-preview textarea');
+    configText.select();
+    configText.setSelectionRange(0, 99999);
+    
+    try {
+        document.execCommand('copy');
+        showNotification('✅ Конфигурация скопирована!', 'success');
+    } catch (err) {
+        showNotification('❌ Ошибка копирования', 'error');
+    }
+}
+
+function downloadQR() {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = document.getElementById('qr-image');
+    
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    
+    ctx.drawImage(img, 0, 0);
+    
+    canvas.toBlob(function(blob) {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = '{{ client_name }}_qr.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        showNotification('📥 QR-код скачан!', 'success');
+    });
+}
+
+function showNotification(message, type) {
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => notification.classList.add('show'), 100);
+    
+    setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => document.body.removeChild(notification), 300);
+    }, 3000);
+}
+</script>
+
+<style>
+.qr-container {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.qr-actions {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 30px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 6px;
+    font-weight: bold;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: inline-block;
+    text-align: center;
+}
+
+.btn-primary { background-color: #007bff; color: white; }
+.btn-success { background-color: #28a745; color: white; }
+.btn-info { background-color: #17a2b8; color: white; }
+.btn-secondary { background-color: #6c757d; color: white; }
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.qr-display {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    margin-bottom: 40px;
+}
+
+.qr-code-container {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    padding: 30px;
+    text-align: center;
+    box-shadow: var(--shadow);
+}
+
+.qr-code-container h3 {
+    margin-top: 0;
+    color: var(--text-primary);
+    margin-bottom: 20px;
+}
+
+.qr-code {
+    display: inline-block;
+    padding: 20px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    margin-bottom: 20px;
+}
+
+.qr-code img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+.qr-instructions {
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.config-preview {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    padding: 30px;
+    box-shadow: var(--shadow);
+}
+
+.config-preview h3 {
+    margin-top: 0;
+    color: #333;
+    margin-bottom: 15px;
+}
+
+.config-preview textarea {
+    width: 100%;
+    height: 250px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    padding: 15px;
+    background: #f8f9fa;
+    resize: vertical;
+    margin-bottom: 15px;
+}
+
+.mobile-instructions {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    margin-bottom: 30px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.mobile-instructions h3 {
+    margin-top: 0;
+    color: #333;
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+.instruction-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 25px;
+}
+
+.instruction-card {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+    border-left: 4px solid #007bff;
+}
+
+.instruction-card h4 {
+    margin-top: 0;
+    color: #007bff;
+    margin-bottom: 15px;
+}
+
+.instruction-card ol {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.instruction-card li {
+    margin-bottom: 8px;
+    line-height: 1.4;
+}
+
+.tips {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.tips h3 {
+    margin-top: 0;
+    color: #333;
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+.tips-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.tip {
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #28a745;
+}
+
+.tip-icon {
+    font-size: 24px;
+    flex-shrink: 0;
+}
+
+.tip-content {
+    flex: 1;
+}
+
+.tip-content strong {
+    color: #333;
+    display: block;
+    margin-bottom: 5px;
+}
+
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px 25px;
+    border-radius: 6px;
+    color: white;
+    font-weight: bold;
+    z-index: 1000;
+    transform: translateX(400px);
+    transition: transform 0.3s ease;
+}
+
+.notification.success {
+    background-color: #28a745;
+}
+
+.notification.error {
+    background-color: #dc3545;
+}
+
+.notification.show {
+    transform: translateX(0);
+}
+
+@media (max-width: 768px) {
+    .qr-display {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+    
+    .instruction-cards {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    .tips-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .qr-actions {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .btn {
+        width: 100%;
+        max-width: 300px;
+    }
+    
+    .qr-code-container,
+    .config-preview,
+    .mobile-instructions,
+    .tips {
+        padding: 20px;
+    }
+}
+
+@media (max-width: 480px) {
+    .qr-code {
+        padding: 10px;
+    }
+    
+    .config-preview textarea {
+        height: 200px;
+        font-size: 11px;
+    }
+}
+</style>
+{% endblock %}
