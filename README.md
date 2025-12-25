@@ -65,7 +65,7 @@
 
 ```bash
 git clone https://github.com/Staxry/WireguardWebManager.git
-cd VPNServerControl
+cd WireguardWebManager
 ```
 
 ### 2. Установка системных пакетов (Ubuntu/Debian)
@@ -110,24 +110,6 @@ python app.py
 
 По умолчанию приложение слушает `http://127.0.0.1:5000`. Для удалённого доступа рекомендуется использовать Nginx как reverse‑proxy с HTTPS.
 
-### 6. Запуск в продакшене (systemd)
-
-В репозитории есть пример юнита `wireguard-web.service` и скрипт управления `wireguard-web-manager.sh`.  
-Пример базовой настройки:
-
-```bash
-sudo cp wireguard-web.service /etc/systemd/system/wireguard-web.service
-sudo systemctl daemon-reload
-sudo systemctl enable wireguard-web
-sudo systemctl start wireguard-web
-sudo systemctl status wireguard-web
-```
-
-Далее настройте Nginx как reverse‑proxy к `127.0.0.1:5000` с SSL (Let’s Encrypt или свой сертификат).
-
----
-
-## 🚀 Возможности (подробно)
 
 ### ✅ Реализованные функции
 
