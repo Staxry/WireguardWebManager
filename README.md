@@ -64,7 +64,7 @@
 ### 1. Клонирование репозитория
 
 ```bash
-git clone https://github.com/<your-username>/VPNServerControl.git
+git clone https://github.com/Staxry/WireguardWebManager.git
 cd VPNServerControl
 ```
 
