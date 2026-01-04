@@ -1,0 +1,831 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Мониторинг{% endblock %}
+
+{% block header %}📊 Dashboard - Мониторинг WireGuard{% endblock %}
+
+{% block content %}
+<!-- Обновление данных -->
+<div class="dashboard-controls">
+    <button onclick="refreshDashboard()" class="btn btn-primary">
+        🔄 Обновить данные
+    </button>
+    <select id="timeRange" onchange="updateTimeRange()">
+        <option value="1h">Последний час</option>
+        <option value="6h">Последние 6 часов</option>
+        <option value="24h" selected>Последние 24 часа</option>
+        <option value="7d">Последние 7 дней</option>
+        <option value="30d">Последние 30 дней</option>
+    </select>
+    <div class="auto-refresh">
+        <label>
+            <input type="checkbox" id="autoRefresh" onchange="toggleAutoRefresh()">
+            Автообновление (30с)
+        </label>
+    </div>
+</div>
+
+<!-- Основные метрики -->
+<div class="metrics-grid">
+    <div class="metric-card">
+        <div class="metric-icon">👥</div>
+        <div class="metric-content">
+            <div class="metric-value" id="totalClients">{{ stats.total_clients }}</div>
+            <div class="metric-label">Всего клиентов</div>
+            <div class="metric-change positive" id="clientsChange">+0</div>
+        </div>
+    </div>
+    
+    <div class="metric-card">
+        <div class="metric-icon">🟢</div>
+        <div class="metric-content">
+            <div class="metric-value" id="activeClients">{{ stats.active_clients }}</div>
+            <div class="metric-label">Активных клиентов</div>
+            <div class="metric-change" id="activeChange">0%</div>
+        </div>
+    </div>
+    
+    <div class="metric-card">
+        <div class="metric-icon">📊</div>
+        <div class="metric-content">
+            <div class="metric-value" id="totalTraffic">{{ stats.total_traffic_formatted }}</div>
+            <div class="metric-label">Общий трафик</div>
+            <div class="metric-change positive" id="trafficChange">+0 MB</div>
+        </div>
+    </div>
+    
+    <div class="metric-card">
+        <div class="metric-icon">⚡</div>
+        <div class="metric-content">
+            <div class="metric-value" id="serverUptime">{{ stats.server_uptime }}</div>
+            <div class="metric-label">Время работы</div>
+            <div class="metric-change positive">Стабильно</div>
+        </div>
+    </div>
+</div>
+
+<!-- Графики -->
+<div class="charts-grid">
+    <!-- График трафика -->
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>📈 Трафик по времени</h3>
+            <div class="chart-controls">
+                <button onclick="toggleTrafficType()" class="btn btn-sm" id="trafficTypeBtn">
+                    Показать отдельно
+                </button>
+            </div>
+        </div>
+        <div class="chart-container">
+            <canvas id="trafficChart" width="400" height="200"></canvas>
+        </div>
+    </div>
+    
+    <!-- График активности клиентов -->
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>👥 Активность клиентов</h3>
+        </div>
+        <div class="chart-container">
+            <canvas id="clientsChart" width="400" height="200"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Топ клиентов и последние события -->
+<div class="info-grid">
+    <!-- Топ клиентов по трафику -->
+    <div class="info-card">
+        <h3>🏆 Топ клиентов по трафику</h3>
+        <div class="top-clients" id="topClients">
+            {% for client in stats.top_clients %}
+            <div class="client-item">
+                <div class="client-info">
+                    <div class="client-name">{{ client.name }}</div>
+                    <div class="client-traffic">{{ client.traffic_formatted }}</div>
+                </div>
+                <div class="client-bar">
+                    <div class="client-bar-fill" style="width: {{ client.percentage }}%"></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Последние события -->
+    <div class="info-card">
+        <h3>📋 Последние события</h3>
+        <div class="events-list" id="eventsList">
+            {% for event in stats.recent_events %}
+            <div class="event-item">
+                <div class="event-time">{{ event.time }}</div>
+                <div class="event-description">{{ event.description }}</div>
+                <div class="event-type {{ event.type }}">{{ event.type_icon }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Системная информация -->
+<div class="system-info">
+    <div class="system-card">
+        <h3>🖥️ Системная информация</h3>
+        <div class="system-stats">
+            <div class="system-stat">
+                <span class="stat-label">CPU:</span>
+                <span class="stat-value" id="cpuUsage">{{ stats.system.cpu_usage }}%</span>
+                <div class="stat-bar">
+                    <div class="stat-bar-fill" style="width: {{ stats.system.cpu_usage }}%"></div>
+                </div>
+            </div>
+            <div class="system-stat">
+                <span class="stat-label">RAM:</span>
+                <span class="stat-value" id="ramUsage">{{ stats.system.ram_usage }}%</span>
+                <div class="stat-bar">
+                    <div class="stat-bar-fill" style="width: {{ stats.system.ram_usage }}%"></div>
+                </div>
+            </div>
+            <div class="system-stat">
+                <span class="stat-label">Диск:</span>
+                <span class="stat-value" id="diskUsage">{{ stats.system.disk_usage }}%</span>
+                <div class="stat-bar">
+                    <div class="stat-bar-fill" style="width: {{ stats.system.disk_usage }}%"></div>
+                </div>
+            </div>
+            <div class="system-stat">
+                <span class="stat-label">Сеть:</span>
+                <span class="stat-value" id="networkStatus">{{ stats.system.network_status }}</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="system-card">
+        <h3>🔧 WireGuard статус</h3>
+        <div class="wireguard-stats">
+            <div class="wg-stat">
+                <span class="stat-label">Интерфейс:</span>
+                <span class="stat-value">{{ stats.wireguard.interface }}</span>
+            </div>
+            <div class="wg-stat">
+                <span class="stat-label">Порт:</span>
+                <span class="stat-value">{{ stats.wireguard.port }}</span>
+            </div>
+            <div class="wg-stat">
+                <span class="stat-label">Публичный ключ:</span>
+                <span class="stat-value key-short">{{ stats.wireguard.public_key[:20] }}...</span>
+            </div>
+            <div class="wg-stat">
+                <span class="stat-label">Статус:</span>
+                <span class="stat-value status-{{ stats.wireguard.status }}">
+                    {{ stats.wireguard.status_text }}
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Алерты -->
+<div class="alerts-section" id="alertsSection" style="display: none;">
+    <div class="alerts-card">
+        <h3>⚠️ Предупреждения и алерты</h3>
+        <div class="alerts-list" id="alertsList">
+            <!-- Алерты будут добавлены через JavaScript -->
+        </div>
+    </div>
+</div>
+
+<script>
+let autoRefreshInterval = null;
+let trafficChart = null;
+let clientsChart = null;
+let showSeparateTraffic = false;
+
+// Инициализация при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    initializeCharts();
+    checkAlerts();
+    
+    // Обновляем данные каждые 30 секунд если включено автообновление
+    if (document.getElementById('autoRefresh').checked) {
+        startAutoRefresh();
+    }
+});
+
+function initializeCharts() {
+    // Инициализация графика трафика
+    const trafficCtx = document.getElementById('trafficChart').getContext('2d');
+    trafficChart = new Chart(trafficCtx, {
+        type: 'line',
+        data: {
+            labels: [], // Будет заполнено через API
+            datasets: [{
+                label: 'Общий трафик (MB)',
+                data: [],
+                borderColor: '#007bff',
+                backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return value + ' MB';
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            }
+        }
+    });
+    
+    // Инициализация графика активности клиентов
+    const clientsCtx = document.getElementById('clientsChart').getContext('2d');
+    clientsChart = new Chart(clientsCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Активные', 'Неактивные'],
+            datasets: [{
+                data: [{{ stats.active_clients }}, {{ stats.total_clients - stats.active_clients }}],
+                backgroundColor: ['#28a745', '#dc3545'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+    
+    // Загружаем данные для графиков
+    loadChartData();
+}
+
+function loadChartData() {
+    const timeRange = document.getElementById('timeRange').value;
+    
+    // Загружаем данные трафика через API
+    fetch(`/api/v1/stats/traffic?range=${timeRange}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateTrafficChart(data.data);
+            }
+        })
+        .catch(error => console.error('Error loading traffic data:', error));
+}
+
+function updateTrafficChart(data) {
+    if (!trafficChart) return;
+    
+    trafficChart.data.labels = data.labels;
+    
+    if (showSeparateTraffic) {
+        trafficChart.data.datasets = [
+            {
+                label: 'Получено (MB)',
+                data: data.received,
+                borderColor: '#28a745',
+                backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                tension: 0.4,
+                fill: true
+            },
+            {
+                label: 'Отправлено (MB)',
+                data: data.sent,
+                borderColor: '#dc3545',
+                backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                tension: 0.4,
+                fill: true
+            }
+        ];
+    } else {
+        trafficChart.data.datasets = [{
+            label: 'Общий трафик (MB)',
+            data: data.total,
+            borderColor: '#007bff',
+            backgroundColor: 'rgba(0, 123, 255, 0.1)',
+            tension: 0.4,
+            fill: true
+        }];
+    }
+    
+    trafficChart.update();
+}
+
+function toggleTrafficType() {
+    showSeparateTraffic = !showSeparateTraffic;
+    const btn = document.getElementById('trafficTypeBtn');
+    btn.textContent = showSeparateTraffic ? 'Показать общий' : 'Показать отдельно';
+    loadChartData();
+}
+
+function updateTimeRange() {
+    loadChartData();
+}
+
+function toggleAutoRefresh() {
+    const checkbox = document.getElementById('autoRefresh');
+    if (checkbox.checked) {
+        startAutoRefresh();
+    } else {
+        stopAutoRefresh();
+    }
+}
+
+function startAutoRefresh() {
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+    }
+    
+    autoRefreshInterval = setInterval(() => {
+        refreshDashboard();
+    }, 30000); // 30 секунд
+}
+
+function stopAutoRefresh() {
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+    }
+}
+
+function refreshDashboard() {
+    // Обновляем основные метрики
+    fetch('/api/v1/stats')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateMetrics(data.data);
+            }
+        })
+        .catch(error => console.error('Error refreshing dashboard:', error));
+    
+    // Обновляем графики
+    loadChartData();
+    
+    // Проверяем алерты
+    checkAlerts();
+    
+    showNotification('Dashboard обновлен', 'success');
+}
+
+function updateMetrics(stats) {
+    document.getElementById('totalClients').textContent = stats.total_clients;
+    document.getElementById('activeClients').textContent = stats.active_clients;
+    document.getElementById('totalTraffic').textContent = stats.total_traffic_formatted;
+    
+    // Обновляем график клиентов
+    if (clientsChart) {
+        clientsChart.data.datasets[0].data = [
+            stats.active_clients,
+            stats.total_clients - stats.active_clients
+        ];
+        clientsChart.update();
+    }
+}
+
+function checkAlerts() {
+    fetch('/api/v1/alerts')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.data.length > 0) {
+                showAlerts(data.data);
+            } else {
+                hideAlerts();
+            }
+        })
+        .catch(error => console.error('Error checking alerts:', error));
+}
+
+function showAlerts(alerts) {
+    const alertsSection = document.getElementById('alertsSection');
+    const alertsList = document.getElementById('alertsList');
+    
+    alertsList.innerHTML = '';
+    
+    alerts.forEach(alert => {
+        const alertElement = document.createElement('div');
+        alertElement.className = `alert alert-${alert.severity}`;
+        alertElement.innerHTML = `
+            <div class="alert-icon">${alert.icon}</div>
+            <div class="alert-content">
+                <div class="alert-title">${alert.title}</div>
+                <div class="alert-message">${alert.message}</div>
+                <div class="alert-time">${alert.time}</div>
+            </div>
+            <button onclick="dismissAlert('${alert.id}')" class="alert-dismiss">✕</button>
+        `;
+        alertsList.appendChild(alertElement);
+    });
+    
+    alertsSection.style.display = 'block';
+}
+
+function hideAlerts() {
+    document.getElementById('alertsSection').style.display = 'none';
+}
+
+function dismissAlert(alertId) {
+    fetch(`/api/v1/alerts/${alertId}/dismiss`, { method: 'POST' })
+        .then(() => checkAlerts())
+        .catch(error => console.error('Error dismissing alert:', error));
+}
+
+// Очистка при закрытии страницы
+window.addEventListener('beforeunload', function() {
+    stopAutoRefresh();
+});
+</script>
+
+<!-- Chart.js библиотека -->
+<script src="{{ url_for('static', filename='chart.umd.min.js') }}"></script>
+
+<style>
+/* Стили для dashboard */
+.dashboard-controls {
+    background: var(--bg-secondary);
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    margin-bottom: 20px;
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.auto-refresh label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+/* Метрики */
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.metric-card {
+    background: var(--bg-secondary);
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    transition: transform 0.3s;
+}
+
+.metric-card:hover {
+    transform: translateY(-2px);
+}
+
+.metric-icon {
+    font-size: 48px;
+    opacity: 0.8;
+}
+
+.metric-content {
+    flex: 1;
+}
+
+.metric-value {
+    font-size: 32px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 5px;
+}
+
+.metric-label {
+    color: #666;
+    font-size: 14px;
+    margin-bottom: 5px;
+}
+
+.metric-change {
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.metric-change.positive {
+    color: #28a745;
+}
+
+.metric-change.negative {
+    color: #dc3545;
+}
+
+/* Графики */
+.charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.chart-card {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+
+.chart-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chart-header h3 {
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.chart-container {
+    padding: 20px;
+    height: 300px;
+    position: relative;
+}
+
+/* Информационные карточки */
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.info-card {
+    background: var(--bg-secondary);
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+}
+
+.info-card h3 {
+    margin: 0 0 20px 0;
+    color: var(--text-primary);
+}
+
+/* Топ клиентов */
+.client-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 15px;
+    padding: 10px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+}
+
+.client-info {
+    flex: 1;
+}
+
+.client-name {
+    font-weight: bold;
+    color: var(--text-primary);
+}
+
+.client-traffic {
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.client-bar {
+    width: 100px;
+    height: 8px;
+    background: var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.client-bar-fill {
+    height: 100%;
+    background: var(--primary-color);
+    transition: width 0.3s;
+}
+
+/* События */
+.event-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 10px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.event-item:last-child {
+    border-bottom: none;
+}
+
+.event-time {
+    font-size: 12px;
+    color: #666;
+    min-width: 80px;
+}
+
+.event-description {
+    flex: 1;
+    color: #333;
+}
+
+.event-type {
+    font-size: 18px;
+}
+
+/* Системная информация */
+.system-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.system-card {
+    background: var(--bg-secondary);
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+}
+
+.system-card h3 {
+    margin: 0 0 20px 0;
+    color: var(--text-primary);
+}
+
+.system-stat, .wg-stat {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.stat-label {
+    min-width: 80px;
+    font-weight: bold;
+    color: var(--text-secondary);
+}
+
+.stat-value {
+    flex: 1;
+    color: var(--text-primary);
+}
+
+.stat-bar {
+    width: 100px;
+    height: 8px;
+    background: var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.stat-bar-fill {
+    height: 100%;
+    background: var(--primary-color);
+    transition: width 0.3s;
+}
+
+/* Алерты */
+.alerts-card {
+    background: var(--bg-secondary);
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    margin-bottom: 20px;
+}
+
+.alerts-card h3 {
+    margin: 0 0 20px 0;
+    color: var(--text-primary);
+}
+
+.alert {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.alert-warning {
+    background: #fff3cd;
+    border-left: 4px solid #ffc107;
+}
+
+.alert-danger {
+    background: #f8d7da;
+    border-left: 4px solid #dc3545;
+}
+
+.alert-info {
+    background: #d1ecf1;
+    border-left: 4px solid #17a2b8;
+}
+
+.alert-icon {
+    font-size: 24px;
+}
+
+.alert-content {
+    flex: 1;
+}
+
+.alert-title {
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 5px;
+}
+
+.alert-message {
+    color: #666;
+    font-size: 14px;
+    margin-bottom: 5px;
+}
+
+.alert-time {
+    color: #999;
+    font-size: 12px;
+}
+
+.alert-dismiss {
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    color: #666;
+    padding: 5px;
+    border-radius: 4px;
+}
+
+.alert-dismiss:hover {
+    background: rgba(0,0,0,0.1);
+}
+
+/* Статусы */
+.status-active {
+    color: #28a745;
+}
+
+.status-inactive {
+    color: #dc3545;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .dashboard-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .metrics-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .charts-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .info-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .system-info {
+        grid-template-columns: 1fr;
+    }
+    
+    .metric-card {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .chart-container {
+        height: 250px;
+    }
+}
+</style>
+{% endblock %}

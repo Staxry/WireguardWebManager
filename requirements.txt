@@ -1,0 +1,38 @@
+# Flask и основные зависимости
+Flask==2.3.3
+Werkzeug==2.3.7
+Jinja2==3.1.2
+MarkupSafe==2.1.3
+itsdangerous==2.1.2
+click==8.1.7
+
+# Для работы с QR кодами
+qrcode==7.4.2
+Pillow>=11.0.0,<12.0.0
+
+# Для работы с базой данных (sqlite3 встроен в Python)
+# sqlite3
+
+# Для работы с системными командами (уже в стандартной библиотеке)
+# subprocess
+# os
+# re
+# json
+# datetime
+# time
+# hashlib
+# hmac
+# collections
+# functools
+
+# Дополнительные утилиты (configparser встроен в Python 3)
+# configparser
+
+# Для разработки и тестирования (опционально)
+# pytest==7.4.2
+# pytest-flask==1.2.0
+# coverage==7.3.2
+
+# Для продакшена (опционально)
+# gunicorn==21.2.0
+# gevent==23.7.0

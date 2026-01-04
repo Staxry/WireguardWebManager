@@ -1,0 +1,454 @@
+{% extends "base.html" %}
+
+{% block title %}Настройки{% endblock %}
+
+{% block header %}⚙️ Настройки администратора{% endblock %}
+
+{% block content %}
+<div class="settings-container">
+    <div class="settings-grid">
+        <!-- Управление учетной записью -->
+        <div class="settings-section">
+            <div class="section-header">
+                <h3>👤 Управление учетной записью</h3>
+                <p>Настройки вашей учетной записи администратора</p>
+            </div>
+            
+            <div class="settings-options">
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <div class="setting-icon">🔐</div>
+                        <div class="setting-details">
+                            <h4>Изменить пароль</h4>
+                            <p>Обновите пароль для входа в систему</p>
+                        </div>
+                    </div>
+                    <div class="setting-action">
+                        <a href="{{ url_for('change_password') }}" class="btn btn-primary">
+                            Изменить пароль
+                        </a>
+                    </div>
+                </div>
+                
+                {% if security_enabled %}
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <div class="setting-icon">👤</div>
+                        <div class="setting-details">
+                            <h4>Изменить имя пользователя</h4>
+                            <p>Обновите имя пользователя для входа в систему</p>
+                        </div>
+                    </div>
+                    <div class="setting-action">
+                        <a href="{{ url_for('change_username') }}" class="btn btn-primary">
+                            Изменить имя
+                        </a>
+                    </div>
+                </div>
+                {% else %}
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <div class="setting-icon">👤</div>
+                        <div class="setting-details">
+                            <h4>Изменить имя пользователя</h4>
+                            <p>Недоступно в базовом режиме</p>
+                        </div>
+                    </div>
+                    <div class="setting-action">
+                        <span class="btn btn-disabled">Недоступно</span>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Информация о сессии -->
+        <div class="settings-section">
+            <div class="section-header">
+                <h3>🔒 Информация о сессии</h3>
+                <p>Текущая информация о вашей сессии</p>
+            </div>
+            
+            <div class="session-info">
+                <div class="info-item">
+                    <span class="info-label">👤 Текущий пользователь:</span>
+                    <span class="info-value">{{ session_info.username }}</span>
+                </div>
+                
+                <div class="info-item">
+                    <span class="info-label">🕐 Время входа:</span>
+                    <span class="info-value">
+                        {% if session_info.login_time %}
+                            {{ session_info.login_time[:16]|replace('T', ' ') }}
+                        {% else %}
+                            Неизвестно
+                        {% endif %}
+                    </span>
+                </div>
+                
+                {% if security_enabled %}
+                <div class="info-item">
+                    <span class="info-label">⏱️ Таймаут сессии:</span>
+                    <span class="info-value">{{ session_info.timeout_minutes }} минут</span>
+                </div>
+                {% endif %}
+                
+                <div class="info-item">
+                    <span class="info-label">🛡️ Режим безопасности:</span>
+                    <span class="info-value">
+                        {% if security_enabled %}
+                            <span class="status-enabled">✅ Включен</span>
+                        {% else %}
+                            <span class="status-disabled">⚠️ Базовый режим</span>
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Системная информация -->
+        <div class="settings-section">
+            <div class="section-header">
+                <h3>🖥️ Системная информация</h3>
+                <p>Информация о системе и приложении</p>
+            </div>
+            
+            <div class="system-info">
+                <div class="info-item">
+                    <span class="info-label">🌐 WireGuard интерфейс:</span>
+                    <span class="info-value">{{ interface_name }}</span>
+                </div>
+                
+                <div class="info-item">
+                    <span class="info-label">📊 Статус интерфейса:</span>
+                    <span class="info-value">
+                        {% if interface_active %}
+                            <span class="status-enabled">✅ Активен</span>
+                        {% else %}
+                            <span class="status-disabled">❌ Неактивен</span>
+                        {% endif %}
+                    </span>
+                </div>
+                
+                <div class="info-item">
+                    <span class="info-label">🔧 Версия приложения:</span>
+                    <span class="info-value">WireGuard Web Management v2.0</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Действия -->
+        <div class="settings-section">
+            <div class="section-header">
+                <h3>🔧 Действия</h3>
+                <p>Дополнительные действия и утилиты</p>
+            </div>
+            
+            <div class="actions-grid">
+                <a href="{{ url_for('dashboard') }}" class="action-card">
+                    <div class="action-icon">📊</div>
+                    <div class="action-content">
+                        <h4>Dashboard</h4>
+                        <p>Мониторинг и статистика</p>
+                    </div>
+                </a>
+
+                <!-- Действия с wg0 пока недоступны в локальной сборке, скрываем, чтобы не ломать страницу -->
+                {# 
+                <form action="{{ url_for('cleanup_orphans') }}" method="post" class="action-card" onsubmit="return confirm('Удалить лишние записи в wg0.conf? Будет создан бэкап.');">
+                    <div class="action-icon">🧹</div>
+                    <div class="action-content">
+                        <h4>Очистить осиротевших</h4>
+                        <p>Создать бэкап и удалить лишние [Peer] из wg0</p>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="margin-top:10px;">Очистить</button>
+                </form>
+
+                <form action="{{ url_for('restore_last_backup') }}" method="post" class="action-card" onsubmit="return confirm('Восстановить последний бэкап wg0.conf?');">
+                    <div class="action-icon">🗂️</div>
+                    <div class="action-content">
+                        <h4>Восстановить бэкап</h4>
+                        <p>Вернуть предыдущую копию wg0.conf</p>
+                    </div>
+                    <button type="submit" class="btn btn-secondary" style="margin-top:10px;">Восстановить</button>
+                </form>
+                #}
+                
+                <a href="{{ url_for('logout') }}" class="action-card logout-card">
+                    <div class="action-icon">🚪</div>
+                    <div class="action-content">
+                        <h4>Выйти</h4>
+                        <p>Завершить сессию</p>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.settings-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 30px;
+}
+
+.settings-section {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+
+.section-header {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: white;
+    padding: 25px;
+    text-align: center;
+}
+
+.section-header h3 {
+    margin: 0 0 10px 0;
+    font-size: 1.4em;
+}
+
+.section-header p {
+    margin: 0;
+    opacity: 0.9;
+    font-size: 0.95em;
+}
+
+.settings-options {
+    padding: 25px;
+}
+
+.setting-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px;
+    border: 2px solid #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    transition: all 0.3s;
+}
+
+.setting-item:hover {
+    border-color: #007bff;
+    background: #f8f9fa;
+}
+
+.setting-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex: 1;
+}
+
+.setting-icon {
+    font-size: 24px;
+    width: 40px;
+    text-align: center;
+}
+
+.setting-details h4 {
+    margin: 0 0 5px 0;
+    color: #333;
+}
+
+.setting-details p {
+    margin: 0;
+    color: #666;
+    font-size: 0.9em;
+}
+
+.setting-action .btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    font-weight: bold;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: inline-block;
+}
+
+.btn-primary {
+    background-color: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+    transform: translateY(-1px);
+}
+
+.btn-disabled {
+    background-color: #6c757d;
+    color: white;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.session-info,
+.system-info {
+    padding: 25px;
+}
+
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.info-item:last-child {
+    border-bottom: none;
+}
+
+.info-label {
+    font-weight: bold;
+    color: #333;
+}
+
+.info-value {
+    color: #666;
+}
+
+.status-enabled {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.status-disabled {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    padding: 25px;
+}
+
+.action-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    border: 2px solid #f8f9fa;
+    border-radius: 8px;
+    text-decoration: none;
+    color: #333;
+    transition: all 0.3s;
+    text-align: center;
+}
+
+.action-card:hover {
+    border-color: #007bff;
+    background: #f8f9fa;
+    transform: translateY(-2px);
+}
+
+.logout-card:hover {
+    border-color: #dc3545;
+    background: #fff5f5;
+}
+
+.action-icon {
+    font-size: 32px;
+    margin-bottom: 10px;
+}
+
+.action-content h4 {
+    margin: 0 0 5px 0;
+    font-size: 1.1em;
+}
+
+.action-content p {
+    margin: 0;
+    font-size: 0.9em;
+    color: #666;
+}
+
+/* Улучшенный контраст для тёмной темы */
+[data-theme="dark"] .settings-section {
+    background: var(--bg-secondary);
+}
+
+[data-theme="dark"] .setting-item {
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .setting-item:hover {
+    border-color: var(--primary-color);
+    background: var(--bg-tertiary);
+}
+
+[data-theme="dark"] .setting-details h4,
+[data-theme="dark"] .info-label,
+[data-theme="dark"] .action-card {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .setting-details p,
+[data-theme="dark"] .info-value,
+[data-theme="dark"] .action-content p {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .info-item {
+    border-bottom-color: var(--border-color);
+}
+
+[data-theme="dark"] .action-card {
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .action-card:hover {
+    border-color: var(--primary-color);
+    background: var(--bg-tertiary);
+}
+
+[data-theme="dark"] .logout-card:hover {
+    border-color: #dc3545;
+    background: #2c0b0e;
+}
+
+@media (max-width: 768px) {
+    .settings-container {
+        padding: 15px;
+    }
+    
+    .settings-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+    
+    .setting-item {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+    }
+    
+    .setting-info {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .info-item {
+        flex-direction: column;
+        gap: 5px;
+        text-align: center;
+    }
+}
+</style>
+{% endblock %}

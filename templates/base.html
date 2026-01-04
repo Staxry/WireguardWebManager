@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}WireGuard Management{% endblock %}</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+    <link rel="alternate icon" href="{{ url_for('static', filename='favicon.svg') }}">
+    {% if session and session.get('timeout_seconds') %}
+    <meta name="session-timeout-seconds" content="{{ session.get('timeout_seconds') }}">
+    {% endif %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- Заголовок -->
+        <div class="header">
+            <div class="header-content">
+                <h1>{% block header %}WireGuard Management{% endblock %}</h1>
+                <div class="header-controls">
+                    <button onclick="toggleTheme()" class="theme-toggle" id="themeToggle" title="Переключить тему">
+                        🌙
+                    </button>
+                    {% if session.username %}
+                    <div class="session-info">
+                        <span id="session-timer">⏱️ <span id="time-left">10:00</span></span>
+                        <a href="{{ url_for('logout') }}" class="logout-btn">🚪 Выход</a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Навигация -->
+        {% if session.username %}
+        <div class="nav">
+            <div class="nav-links">
+                <a href="{{ url_for('index') }}" {% if request.endpoint == 'index' %}class="active"{% endif %}>
+                    🏠 Главная
+                </a>
+                <a href="{{ url_for('add_client') }}" {% if request.endpoint == 'add_client' %}class="active"{% endif %}>
+                    ➕ Добавить клиента
+                </a>
+                <a href="/dashboard" {% if request.endpoint == 'dashboard' %}class="active"{% endif %}>
+                    📊 Dashboard
+                </a>
+                <a href="{{ url_for('settings') }}" {% if request.endpoint in ['settings', 'change_password', 'change_username'] %}class="active"{% endif %}>
+                    ⚙️ Настройки
+                </a>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Сообщения -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'error' if category == 'error' else category }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Основной контент -->
+        <div class="content">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+    {% if get_flashed_messages() %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            {% for category, message in get_flashed_messages(with_categories=true) %}
+            showNotification('{{ message }}', '{{ 'error' if category == 'error' else category }}');
+            {% endfor %}
+        });
+    </script>
+    {% endif %}
+</body>
+</html>

@@ -1,0 +1,411 @@
+{% extends "base.html" %}
+
+{% block title %}Смена имени пользователя{% endblock %}
+
+{% block header %}👤 Смена имени пользователя{% endblock %}
+
+{% block content %}
+<div class="username-container">
+    <form method="POST" class="username-form" onsubmit="return validateForm()">
+        <div class="form-group">
+            <label for="current_password">🔒 Текущий пароль:</label>
+            <input type="password" 
+                   id="current_password" 
+                   name="current_password" 
+                   required 
+                   placeholder="Введите текущий пароль для подтверждения">
+        </div>
+        
+        <div class="form-group">
+            <label for="new_username">👤 Новое имя пользователя:</label>
+            <input type="text" 
+                   id="new_username" 
+                   name="new_username" 
+                   required 
+                   minlength="3"
+                   maxlength="50"
+                   pattern="[a-zA-Z0-9_-]+"
+                   placeholder="Минимум 3 символа"
+                   oninput="checkUsernameValidity()">
+            <div id="username-validity" class="username-validity"></div>
+        </div>
+        
+        <div class="form-group">
+            <label for="confirm_username">👤 Подтвердите новое имя пользователя:</label>
+            <input type="text" 
+                   id="confirm_username" 
+                   name="confirm_username" 
+                   required 
+                   placeholder="Повторите новое имя пользователя"
+                   oninput="checkUsernameMatch()">
+            <div id="username-match" class="username-match"></div>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="submit-btn">
+                👤 Изменить имя пользователя
+            </button>
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                ↩️ Отмена
+            </a>
+        </div>
+    </form>
+</div>
+
+<div class="username-requirements">
+    <h3>📋 Требования к имени пользователя</h3>
+    <ul class="requirements-list">
+        <li id="req-length">📏 От 3 до 50 символов</li>
+        <li id="req-chars">🔤 Только буквы, цифры, дефисы и подчеркивания</li>
+        <li id="req-start">🔤 Должно начинаться с буквы или цифры</li>
+        <li id="req-end">🔤 Должно заканчиваться буквой или цифрой</li>
+    </ul>
+</div>
+
+<div class="security-tips">
+    <h3>🛡️ Советы по безопасности</h3>
+    <div class="tips-grid">
+        <div class="tip">
+            <div class="tip-icon">👤</div>
+            <div class="tip-content">
+                <strong>Выберите уникальное имя</strong><br>
+                Используйте имя, которое не связано с вашими другими аккаунтами
+            </div>
+        </div>
+        
+        <div class="tip">
+            <div class="tip-icon">📝</div>
+            <div class="tip-content">
+                <strong>Запомните новое имя</strong><br>
+                Убедитесь, что запомнили новое имя пользователя для входа
+            </div>
+        </div>
+        
+        <div class="tip">
+            <div class="tip-icon">🔒</div>
+            <div class="tip-content">
+                <strong>Подтвердите паролем</strong><br>
+                Для безопасности требуется подтверждение текущим паролем
+            </div>
+        </div>
+        
+        <div class="tip">
+            <div class="tip-icon">⚠️</div>
+            <div class="tip-content">
+                <strong>Будьте осторожны</strong><br>
+                После изменения используйте новое имя для входа в систему
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function checkUsernameValidity() {
+    const username = document.getElementById('new_username').value;
+    const validityDiv = document.getElementById('username-validity');
+    
+    const requirements = {
+        length: username.length >= 3 && username.length <= 50,
+        chars: /^[a-zA-Z0-9_-]+$/.test(username),
+        start: /^[a-zA-Z0-9]/.test(username),
+        end: /[a-zA-Z0-9]$/.test(username)
+    };
+    
+    // Обновляем визуальные индикаторы требований
+    updateRequirement('req-length', requirements.length);
+    updateRequirement('req-chars', requirements.chars);
+    updateRequirement('req-start', requirements.start);
+    updateRequirement('req-end', requirements.end);
+    
+    // Проверяем валидность
+    const allMet = Object.values(requirements).every(Boolean);
+    let validity = '';
+    let className = '';
+    
+    if (username.length === 0) {
+        validity = '';
+        className = '';
+    } else if (!allMet) {
+        validity = '❌ Имя пользователя не соответствует требованиям';
+        className = 'invalid';
+    } else {
+        validity = '✅ Имя пользователя корректно';
+        className = 'valid';
+    }
+    
+    validityDiv.textContent = validity;
+    validityDiv.className = `username-validity ${className}`;
+}
+
+function checkUsernameMatch() {
+    const username = document.getElementById('new_username').value;
+    const confirm = document.getElementById('confirm_username').value;
+    const matchDiv = document.getElementById('username-match');
+    
+    if (confirm.length === 0) {
+        matchDiv.textContent = '';
+        matchDiv.className = 'username-match';
+    } else if (username === confirm) {
+        matchDiv.textContent = '✅ Имена пользователя совпадают';
+        matchDiv.className = 'username-match match';
+    } else {
+        matchDiv.textContent = '❌ Имена пользователя не совпадают';
+        matchDiv.className = 'username-match no-match';
+    }
+}
+
+function updateRequirement(id, met) {
+    const element = document.getElementById(id);
+    if (met) {
+        element.classList.add('met');
+        element.classList.remove('not-met');
+    } else {
+        element.classList.add('not-met');
+        element.classList.remove('met');
+    }
+}
+
+function validateForm() {
+    const username = document.getElementById('new_username').value;
+    const confirm = document.getElementById('confirm_username').value;
+    const password = document.getElementById('current_password').value;
+    
+    if (!password) {
+        alert('❌ Введите текущий пароль!');
+        return false;
+    }
+    
+    // Проверяем все требования к имени пользователя
+    const requirements = {
+        length: username.length >= 3 && username.length <= 50,
+        chars: /^[a-zA-Z0-9_-]+$/.test(username),
+        start: /^[a-zA-Z0-9]/.test(username),
+        end: /[a-zA-Z0-9]$/.test(username)
+    };
+    
+    const allMet = Object.values(requirements).every(Boolean);
+    
+    if (!allMet) {
+        alert('❌ Имя пользователя не соответствует всем требованиям!');
+        return false;
+    }
+    
+    if (username !== confirm) {
+        alert('❌ Имена пользователя не совпадают!');
+        return false;
+    }
+    
+    return confirm('👤 Вы уверены, что хотите изменить имя пользователя?\n\nПосле изменения используйте новое имя для входа в систему.');
+}
+
+// Инициализация при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    checkUsernameValidity();
+    checkUsernameMatch();
+});
+</script>
+
+<style>
+.username-container {
+    max-width: 500px;
+    margin: 0 auto;
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    margin-bottom: 30px;
+}
+
+.username-form .form-group {
+    margin-bottom: 25px;
+}
+
+.username-form label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+    color: #333;
+}
+
+.username-form input[type="text"],
+.username-form input[type="password"] {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-size: 16px;
+    transition: border-color 0.3s;
+}
+
+.username-form input[type="text"]:focus,
+.username-form input[type="password"]:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.25);
+}
+
+.username-validity {
+    margin-top: 8px;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.username-validity.valid { color: #28a745; }
+.username-validity.invalid { color: #dc3545; }
+
+.username-match {
+    margin-top: 8px;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.username-match.match { color: #28a745; }
+.username-match.no-match { color: #dc3545; }
+
+.form-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    margin-top: 30px;
+}
+
+.btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: bold;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: inline-block;
+    text-align: center;
+}
+
+.btn-primary {
+    background-color: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+    transform: translateY(-1px);
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background-color: #5a6268;
+    transform: translateY(-1px);
+}
+
+.username-requirements {
+    max-width: 500px;
+    margin: 0 auto 30px;
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.username-requirements h3 {
+    margin-top: 0;
+    color: #333;
+    margin-bottom: 20px;
+}
+
+.requirements-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.requirements-list li {
+    padding: 8px 0;
+    transition: all 0.3s;
+    border-radius: 4px;
+    padding-left: 10px;
+    margin-bottom: 5px;
+}
+
+.requirements-list li.met {
+    background-color: #d4edda;
+    color: #155724;
+    border-left: 4px solid #28a745;
+}
+
+.requirements-list li.not-met {
+    background-color: #f8d7da;
+    color: #721c24;
+    border-left: 4px solid #dc3545;
+}
+
+.security-tips {
+    max-width: 800px;
+    margin: 0 auto;
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.security-tips h3 {
+    margin-top: 0;
+    color: #333;
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+.tips-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.tip {
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #007bff;
+}
+
+.tip-icon {
+    font-size: 24px;
+    flex-shrink: 0;
+}
+
+.tip-content {
+    flex: 1;
+}
+
+.tip-content strong {
+    color: #333;
+    display: block;
+    margin-bottom: 5px;
+}
+
+@media (max-width: 768px) {
+    .username-container,
+    .username-requirements,
+    .security-tips {
+        margin-left: 15px;
+        margin-right: 15px;
+        padding: 20px;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .tips-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %}

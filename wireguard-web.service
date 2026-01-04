@@ -1,0 +1,23 @@
+[Unit]
+Description=WireGuard Web Management Interface v2.0
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/wireguard-web
+ExecStart=/usr/bin/python3 /opt/wireguard-web/app.py
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+# Безопасность
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/wireguard-web /etc/wireguard /root
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

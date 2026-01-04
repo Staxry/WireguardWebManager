@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+
+{% block title %}Настройка путей - WireGuard Management{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="header-section">
+        <h1>🔧 Настройка путей к конфигурациям</h1>
+        <p>Укажите пути к директориям и файлам конфигураций WireGuard</p>
+    </div>
+
+    <div class="config-section">
+        <h2>📁 Текущие настройки</h2>
+        <div class="current-paths">
+            <div class="path-item">
+                <strong>Клиентские конфигурации:</strong>
+                <code>{{ current_client_path }}</code>
+                <a href="{{ url_for('browse_directory', path=current_client_path) }}" class="btn btn-sm btn-outline">Просмотр</a>
+            </div>
+            <div class="path-item">
+                <strong>Серверная конфигурация:</strong>
+                <code>{{ current_server_path }}</code>
+                <a href="{{ url_for('browse_directory', path=current_server_path|dirname) }}" class="btn btn-sm btn-outline">Просмотр</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="config-section">
+        <h2>🔍 Быстрый поиск конфигураций</h2>
+        <div class="quick-scan">
+            <button onclick="scanCommonPaths()" class="btn btn-primary">Сканировать стандартные пути</button>
+            <div id="scan-results" class="scan-results"></div>
+        </div>
+    </div>
+
+    <div class="config-section">
+        <h2>📂 Изменить пути</h2>
+        
+        <div class="path-config">
+            <h3>Путь к клиентским конфигурациям</h3>
+            <form method="POST" action="{{ url_for('set_config_path') }}" class="path-form">
+                <input type="hidden" name="path_type" value="client">
+                <div class="input-group">
+                    <input type="text" name="path" value="{{ current_client_path }}" placeholder="/root/" class="form-control">
+                    <button type="button" onclick="browseForPath('client')" class="btn btn-outline">Обзор</button>
+                    <button type="submit" class="btn btn-success">Сохранить</button>
+                </div>
+                <small class="help-text">Директория, где хранятся файлы клиентов (например: /root/, /home/user/wireguard/)</small>
+            </form>
+        </div>
+
+        <div class="path-config">
+            <h3>Путь к серверной конфигурации</h3>
+            <form method="POST" action="{{ url_for('set_config_path') }}" class="path-form">
+                <input type="hidden" name="path_type" value="server">
+                <div class="input-group">
+                    <input type="text" name="path" value="{{ current_server_path }}" placeholder="/etc/wireguard/wg0.conf" class="form-control">
+                    <button type="button" onclick="browseForPath('server')" class="btn btn-outline">Обзор</button>
+                    <button type="submit" class="btn btn-success">Сохранить</button>
+                </div>
+                <small class="help-text">Полный путь к файлу серверной конфигурации (например: /etc/wireguard/wg0.conf)</small>
+            </form>
+        </div>
+    </div>
+
+    <div class="actions">
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">← Назад к списку клиентов</a>
+        <a href="{{ url_for('browse_directory') }}" class="btn btn-primary">🗂️ Обзор файловой системы</a>
+    </div>
+</div>
+
+<style>
+.config-section {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow);
+}
+
+.current-paths {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.path-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    flex-wrap: wrap;
+}
+
+.path-item code {
+    background: var(--bg-primary);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    flex: 1;
+    min-width: 200px;
+}
+
+.path-config {
+    margin-bottom: 24px;
+}
+
+.path-config h3 {
+    margin-bottom: 12px;
+    color: var(--text-primary);
+}
+
+.input-group {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.form-control {
+    flex: 1;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-family: 'Courier New', monospace;
+}
+
+.help-text {
+    color: var(--text-muted);
+    font-size: 0.9em;
+}
+
+.quick-scan {
+    text-align: center;
+}
+
+.scan-results {
+    margin-top: 16px;
+    padding: 16px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    display: none;
+}
+
+.scan-result-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.scan-result-item:last-child {
+    border-bottom: none;
+}
+
+.actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 32px;
+}
+
+@media (max-width: 768px) {
+    .path-item {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .input-group {
+        flex-direction: column;
+    }
+    
+    .actions {
+        flex-direction: column;
+    }
+}
+</style>
+
+<script>
+function browseForPath(type) {
+    const currentPath = type === 'client' ? '{{ current_client_path }}' : '{{ current_server_path|dirname }}';
+    window.open(`{{ url_for('browse_directory') }}?path=${encodeURIComponent(currentPath)}`, '_blank');
+}
+
+function scanCommonPaths() {
+    const resultsDiv = document.getElementById('scan-results');
+    resultsDiv.style.display = 'block';
+    resultsDiv.innerHTML = '<div class="loading">🔍 Сканирование...</div>';
+    
+    const commonPaths = ['/root', '/etc/wireguard', '/home', '/opt/wireguard', '/var/lib/wireguard'];
+    
+    Promise.all(commonPaths.map(path => 
+        fetch(`{{ url_for('scan_configs_in_path') }}?path=${encodeURIComponent(path)}`)
+            .then(response => response.json())
+            .catch(() => ({error: `Ошибка доступа к ${path}`}))
+    )).then(results => {
+        let html = '<h4>Результаты сканирования:</h4>';
+        
+        results.forEach((result, index) => {
+            const path = commonPaths[index];
+            if (result.error) {
+                html += `<div class="scan-result-item">
+                    <span>❌ ${path}</span>
+                    <span class="text-muted">${result.error}</span>
+                </div>`;
+            } else if (result.count > 0) {
+                html += `<div class="scan-result-item">
+                    <span>✅ ${path}</span>
+                    <span>Найдено: ${result.count} конфигов</span>
+                    <button onclick="setPath('${path}', 'client')" class="btn btn-sm btn-success">Использовать</button>
+                </div>`;
+            } else {
+                html += `<div class="scan-result-item">
+                    <span>📁 ${path}</span>
+                    <span class="text-muted">Конфиги не найдены</span>
+                </div>`;
+            }
+        });
+        
+        resultsDiv.innerHTML = html;
+    });
+}
+
+function setPath(path, type) {
+    const form = document.querySelector(`form input[name="path_type"][value="${type}"]`).closest('form');
+    form.querySelector('input[name="path"]').value = type === 'client' ? path + '/' : path;
+}
+</script>
+{% endblock %}
