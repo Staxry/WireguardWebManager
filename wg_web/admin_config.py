@@ -44,17 +44,30 @@ DEFAULT_ADMIN_CONFIG = {
 }
 
 # Путь к файлу конфигурации
-CONFIG_FILE = '/etc/wireguard/admin_config.json'
+CONFIG_FILE = '/etc/wireguard-web/admin_config.json'
 # Путь к корню проекта (на уровень выше пакета wg_web)
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FALLBACK_CONFIG_FILE = os.path.join(PROJECT_ROOT, '.admin_config.json')
 
 def get_config_file_path():
-    """Определяет путь к файлу конфигурации"""
-    if os.access('/etc/wireguard/', os.W_OK):
+    """Определяет путь к файлу конфигурации, отдавая приоритет стандартному пути."""
+    # Проверяем, существует ли основной файл конфигурации
+    if os.path.exists(CONFIG_FILE):
         return CONFIG_FILE
-    else:
+
+    # Проверяем, существует ли запасной файл конфигурации
+    if os.path.exists(FALLBACK_CONFIG_FILE):
         return FALLBACK_CONFIG_FILE
+
+    # Если файл не существует, определяем путь по умолчанию на основе прав на запись для создания
+    try:
+        if os.access(os.path.dirname(CONFIG_FILE), os.W_OK):
+            return CONFIG_FILE
+    except FileNotFoundError:
+        # Директория /etc/wireguard-web/ может не существовать
+        pass
+
+    return FALLBACK_CONFIG_FILE
 
 def load_admin_config():
     """Загружает конфигурацию администратора"""
